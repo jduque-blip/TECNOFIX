@@ -1,0 +1,148 @@
+// Presupuesto del técnico: filas de repuestos y total en vivo (el servidor recalcula todo al guardar).
+(function () {
+  var f = document.querySelector('[data-presupuesto]');
+  if (!f) return;
+  var cont = f.querySelector('[data-repuestos]');
+  var plantilla = f.querySelector('template[data-plantilla]');
+  var iva = parseFloat(f.dataset.iva) || 0;
+  var dinero = function (n) { return '$' + n.toFixed(2); };
+
+  function total() {
+    var sub = 0;
+    f.querySelectorAll('input[name^=tarifa_]').forEach(function (i) {
+      var n = parseInt(i.value, 10);
+      if (n > 0 && i.dataset.precio) sub += n * parseFloat(i.dataset.precio);
+    });
+    f.querySelectorAll('[data-fila-servicio]').forEach(function (fila) {
+      var o = fila.querySelector('select').selectedOptions[0];
+      var n = parseInt(fila.querySelector('input').value, 10);
+      if (o && o.dataset.precio && n > 0) sub += n * parseFloat(o.dataset.precio);
+    });
+    cont.querySelectorAll('[data-fila]').forEach(function (fila) {
+      var o = fila.querySelector('select[name=producto]').selectedOptions[0];
+      var n = parseInt(fila.querySelector('input').value, 10);
+      if (o && o.dataset.precio && n > 0) sub += n * parseFloat(o.dataset.precio);
+    });
+    var im = Math.round(sub * iva) / 100;
+    f.querySelector('[data-subtotal]').textContent = dinero(sub);
+    f.querySelector('[data-iva-monto]').textContent = dinero(im);
+    f.querySelector('[data-total]').textContent = dinero(sub + im);
+  }
+
+  function agregar() {
+    cont.appendChild(plantilla.content.cloneNode(true));
+    total();
+  }
+  f.querySelector('[data-agregar-repuesto]').addEventListener('click', agregar);
+  f.addEventListener('input', total);
+  f.addEventListener('change', total);
+  f.addEventListener('click', function (e) {
+    if (e.target.matches('[data-quitar]')) { e.target.closest('[data-fila]').remove(); total(); }
+  });
+  var servicios = f.querySelector('[data-servicios]'), plantillaServ = f.querySelector('template[data-plantilla-servicio]');
+  var btnServ = f.querySelector('[data-agregar-servicio]');
+  if (btnServ && servicios && plantillaServ) {
+    btnServ.addEventListener('click', function () { servicios.appendChild(plantillaServ.content.cloneNode(true)); total(); });
+    servicios.addEventListener('click', function (e) {
+      if (e.target.matches('[data-quitar-servicio]')) { e.target.closest('[data-fila-servicio]').remove(); total(); }
+    });
+    servicios.appendChild(plantillaServ.content.cloneNode(true));  // una fila lista para elegir
+  }
+  var falta = f.querySelector('[data-faltan]'), plantillaFalta = f.querySelector('[data-plantilla-falta]');
+  var btnFalta = f.querySelector('[data-agregar-falta]');
+  if (btnFalta && falta && plantillaFalta) {
+    btnFalta.addEventListener('click', function () { falta.appendChild(plantillaFalta.content.cloneNode(true)); });
+    falta.addEventListener('click', function (e) {
+      if (e.target.matches('[data-quitar-falta]')) e.target.closest('[data-fila-falta]').remove();
+    });
+  }
+  total();
+})();
+
+// Cotización de la pieza (administrador): los días salen del proveedor y el precio se sugiere con el margen.
+document.querySelectorAll('[data-cotizar]').forEach(function (c) {
+  var prov = c.querySelector('[data-proveedor]'), dias = c.querySelector('[data-dias]');
+  var costo = c.querySelector('[data-costo]'), precio = c.querySelector('[data-precio]');
+  var margen = parseFloat(c.dataset.margen) || 0, tocado = false;
+  prov.addEventListener('change', function () {
+    var o = prov.selectedOptions[0];
+    if (o && o.dataset.dias !== undefined) dias.value = o.dataset.dias;
+  });
+  precio.addEventListener('input', function () { tocado = true; });
+  costo.addEventListener('input', function () {
+    var v = parseFloat(costo.value.replace(',', '.'));
+    if (!tocado && v > 0) precio.value = (Math.ceil(v * (1 + margen / 100) * 20) / 20).toFixed(2);
+  });
+});
+
+// Búsqueda de repuestos del inventario (técnico): filtra la lista mientras escribe.
+document.querySelectorAll('[data-uso]').forEach(function (f) {
+  var q = f.querySelector('[data-filtro]'), lista = f.querySelector('[data-lista]');
+  q.addEventListener('input', function () {
+    var t = q.value.trim().toLowerCase();
+    Array.prototype.forEach.call(lista.options, function (o) {
+      if (!o.value) return;
+      var ok = !t || (o.dataset.texto || '').indexOf(t) !== -1;
+      o.hidden = !ok; o.disabled = !ok;
+    });
+  });
+});
+
+// Filtro por categoría: oculta los repuestos de otras categorías en las listas del formulario.
+document.querySelectorAll('[data-categoria-filtro]').forEach(function (cat) {
+  var f = cat.closest('form');
+  function aplicar(raiz) {
+    (raiz || f).querySelectorAll('select[name=producto] option').forEach(function (o) {
+      if (!o.value) return;
+      var ok = !cat.value || o.dataset.categoria === cat.value;
+      o.hidden = !ok; o.disabled = !ok;
+    });
+  }
+  cat.addEventListener('change', function () {
+    aplicar();
+    f.querySelectorAll('select[name=producto]').forEach(function (s) { if (s.selectedOptions[0] && s.selectedOptions[0].disabled) s.value = ''; });
+    f.dispatchEvent(new Event('change'));
+  });
+  f.addEventListener('click', function (e) { if (e.target.matches('[data-agregar-repuesto]')) setTimeout(aplicar, 0); });
+});
+
+// Tipo de pieza (técnico): «agotada» muestra el inventario; «nueva» pide el nombre.
+document.querySelectorAll('[data-tipo-pieza]').forEach(function (g) {
+  var f = g.closest('form'), nueva = f.querySelector('[data-bloque-nueva]'), agot = f.querySelector('[data-bloque-agotada]');
+  function mostrar() {
+    var esAgotada = f.querySelector('[name="tipo_pieza"]:checked').value === 'agotada';
+    nueva.classList.toggle('hidden', esAgotada);
+    agot.classList.toggle('hidden', !esAgotada);
+    agot.querySelector('select').disabled = !esAgotada;
+  }
+  g.addEventListener('change', mostrar);
+  mostrar();
+});
+
+// Cotización (administrador): al elegir la categoría solo se ven los proveedores de esa categoría.
+document.querySelectorAll('[data-categoria-pieza]').forEach(function (cat) {
+  var prov = cat.closest('form').querySelector('[data-proveedor]');
+  function filtrar() {
+    var id = cat.value;
+    Array.prototype.forEach.call(prov.options, function (o) {
+      if (!o.value) return;
+      var ok = !id || (o.dataset.cats || '').split(',').indexOf(id) !== -1;
+      o.hidden = !ok; o.disabled = !ok;
+    });
+    if (prov.selectedOptions[0] && prov.selectedOptions[0].disabled) prov.value = '';
+  }
+  cat.addEventListener('change', filtrar);
+});
+
+// Categoría por fila del presupuesto: cada repuesto se filtra solo con su propia categoría.
+document.addEventListener('change', function (e) {
+  if (!e.target.matches('[data-categoria-fila]')) return;
+  var fila = e.target.closest('[data-fila]'), prod = fila.querySelector('select[name=producto]');
+  Array.prototype.forEach.call(prod.options, function (o) {
+    if (!o.value) return;
+    var ok = !e.target.value || o.dataset.categoria === e.target.value;
+    o.hidden = !ok; o.disabled = !ok;
+  });
+  if (prod.selectedOptions[0] && prod.selectedOptions[0].disabled) prod.value = '';
+  prod.dispatchEvent(new Event('change', { bubbles: true }));
+});

@@ -1,0 +1,15 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  {% include 'inventario/_subtabs.html' with sub='mov' %}
+  <form method="get" class="flex gap-2 flex-wrap mb-3">
+    <input name="q" class="inp flex-1 min-w-[220px]" placeholder="Buscar por producto, código o motivo" value="{{ q }}" data-buscar autocomplete="off">
+    <select name="tipo" class="inp w-auto" data-autoenviar aria-label="Tipo de movimiento">
+      <option value="">Todos los tipos</option>
+      {% for v, e in tipos %}<option value="{{ v }}"{% if tipo == v %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
+  </form>
+  {% include 'inventario/_movimientos_tabla.html' with lista=pagina %}
+  {% include 'parciales/_paginador.html' with estado=tipo %}
+{% endblock %}

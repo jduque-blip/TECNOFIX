@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load iconos %}
+
+{% block titulo %}Chat con {{ otro.nombre }} · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-3">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <a href="{% url 'chat_bandeja' %}" class="btn glass text-sm">← Mensajes</a>
+      {% if orden %}
+        <a href="{% if user.es_admin %}{% url 'orden_admin' orden.pk %}{% else %}{% url 'equipo' orden.pk %}{% endif %}" class="btn glass text-sm">Equipo #{{ orden.pk }} · {{ orden.modelo }}</a>
+      {% endif %}
+    </div>
+    <h2 class="text-xl font-extrabold">{{ otro.nombre }} <span class="text-sm font-normal opacity-60">{{ otro.get_rol_display }}</span></h2>
+
+    <div id="mensajes" class="glass rounded-3xl p-4 space-y-2 h-[50vh] overflow-y-auto" data-url="{% url 'chat_nuevos' otro.pk %}" data-ultimo="{{ ultimo }}" aria-live="polite">
+      {% for m in mensajes %}
+        <div class="flex {% if m.mio %}justify-end{% endif %}" data-id="{{ m.id }}">
+          <div class="max-w-[80%] rounded-2xl px-4 py-2 {% if m.mio %}g1 text-white{% else %}glass{% endif %}">
+            {% if m.orden %}<div class="text-[11px] opacity-70 mb-1">Sobre {{ m.orden }}</div>{% endif %}
+            <div class="whitespace-pre-line break-words">{{ m.texto }}</div>
+            <div class="text-[11px] opacity-70 mt-1 text-right">{{ m.hora }}</div>
+          </div>
+        </div>
+      {% empty %}
+        <p class="opacity-60 text-sm text-center" data-vacio>Aún no hay mensajes. Escribe el primero.</p>
+      {% endfor %}
+    </div>
+
+    <form method="post" class="space-y-2" novalidate>
+      {% csrf_token %}
+      {% if orden %}<input type="hidden" name="orden" value="{{ orden.pk }}">{% endif %}
+      {{ form.texto }}
+      {% if form.texto.errors %}<p class="text-xs text-rose-500 px-1">{{ form.texto.errors.0 }}</p>{% endif %}
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs opacity-60">Ctrl + Enter para enviar</span>
+        <button type="submit" class="btn g1 t inline-flex items-center gap-2">{% ico 'send' 'w-4 h-4' %}Enviar</button>
+      </div>
+    </form>
+  </main>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% load iconos %}{# Tarjeta de un equipo en proceso. Recibe: o (la orden) #}
+<a href="{% url 'equipo' o.pk %}" class="glass rounded-2xl p-4 mb-3 flex gap-4 items-center hover:-translate-y-0.5 transition">
+  {% with foto=o.fotos.all|first %}
+    <div class="relative overflow-hidden w-20 h-20 rounded-xl bg-slate-500/20 flex items-center justify-center shrink-0">
+      {% if foto %}
+        <img src="{{ foto.imagen.url }}" alt="Foto de {{ o.modelo }}" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
+      {% else %}
+        {% ico_servicio o.servicio.nombre 'w-8 h-8 opacity-60' %}
+      {% endif %}
+    </div>
+  {% endwith %}
+  <div class="min-w-0 flex-1">
+    <div class="flex items-center gap-2 flex-wrap">
+      <b>#{{ o.pk }} · {{ o.modelo }}</b>
+      {% include 'parciales/_estado.html' with orden=o %}
+    </div>
+    <div class="text-sm opacity-70">{{ o.servicio.nombre }}</div>
+    <div class="text-sm opacity-70 mt-1">
+      {% if user.es_cliente %}
+        {% if o.tecnico %}Técnico: {{ o.tecnico.nombre }}{% else %}Aún sin técnico asignado{% endif %}
+      {% else %}
+        Cliente: {{ o.cliente.nombre }}
+      {% endif %}
+      {% if o.fecha_estimada %} · Entrega estimada: {{ o.fecha_estimada|date:"d/m/Y" }}
+        {% with d=o.dias_para_entrega %}<b class="{% if d < 0 %}text-rose-500{% elif d <= 1 %}text-amber-500{% endif %}">({% if d < 0 %}{{ d|cut:"-" }} día{{ d|cut:"-"|pluralize }} de atraso{% elif d == 0 %}vence hoy{% elif d == 1 %}vence mañana{% else %}faltan {{ d }} días{% endif %})</b>{% endwith %}
+      {% endif %}
+    </div>
+  </div>
+</a>

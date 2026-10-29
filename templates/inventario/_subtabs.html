@@ -1,0 +1,6 @@
+{% load iconos %}
+<div class="flex gap-2 flex-wrap mb-3">
+  <a href="{% url 'inventario' %}" class="btn text-sm {% if sub == 'prod' %}g1 t{% else %}glass{% endif %}">Productos</a>
+  <a href="{% url 'movimientos' %}" class="btn text-sm {% if sub == 'mov' %}g1 t{% else %}glass{% endif %}">Movimientos</a>
+  <a href="{% url 'proveedores' %}" class="btn text-sm {% if sub == 'prv' %}g1 t{% else %}glass{% endif %}">Proveedores</a>
+</div>

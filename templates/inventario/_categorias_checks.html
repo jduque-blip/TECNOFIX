@@ -1,0 +1,14 @@
+{# Casillas de categorías. Recibe: campo (form.categorias) #}
+<div>
+  <b class="text-sm">Categorías que vende</b>
+  <div class="flex gap-2 flex-wrap mt-1">
+    {% for c in campo.field.queryset %}
+      <label class="inline-flex items-center gap-2 rounded-full bg-slate-500/10 px-3 py-1 text-sm cursor-pointer">
+        <input type="checkbox" name="{{ campo.html_name }}" value="{{ c.pk }}"{% for sel in campo.value %}{% if sel|stringformat:"s" == c.pk|stringformat:"s" %} checked{% endif %}{% endfor %}> {{ c.nombre }}
+      </label>
+    {% empty %}
+      <span class="text-sm opacity-70">Primero crea categorías (en la página de proveedores).</span>
+    {% endfor %}
+  </div>
+  {% if campo.errors %}<p class="text-xs text-rose-500 mt-1">{{ campo.errors.0 }}</p>{% endif %}
+</div>

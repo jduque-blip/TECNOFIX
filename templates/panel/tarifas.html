@@ -1,0 +1,136 @@
+{% extends 'panel/admin_base.html' %}
+{% load formato iconos %}
+
+{% block panel %}
+  {# IVA #}
+  <form method="post" action="{% url 'iva_guardar' %}" class="glass rounded-2xl p-4 flex items-center gap-3 flex-wrap">
+    {% csrf_token %}
+    <span class="font-bold">Impuesto (IVA) %</span>
+    <input name="valor" type="number" step="0.01" min="0" max="100" value="{{ iva|numero_limpio }}" class="inp w-28" data-autoenviar aria-label="Porcentaje de IVA">
+    <span class="text-sm opacity-70">Se suma automáticamente a los presupuestos.</span>
+  </form>
+
+  {# Cuenta para transferencias #}
+  <form method="post" action="{% url 'transferencia_guardar' %}" class="glass rounded-2xl p-4 mt-3 space-y-2">
+    {% csrf_token %}
+    <label for="datos_transf" class="font-bold">Cuenta para transferencias</label>
+    <input id="datos_transf" name="datos" maxlength="200" value="{{ datos_transferencia }}" class="inp w-full" placeholder="Banco, tipo y número de cuenta, titular y cédula">
+    <div class="flex items-center justify-between gap-2 flex-wrap"><span class="text-sm opacity-70">Se muestra al cliente cuando su equipo está listo para pagar.</span><button type="submit" class="btn g3 t text-sm">Guardar</button></div>
+  </form>
+
+  {# Imagen de la portada #}
+  <h3 class="text-lg font-extrabold mt-6 mb-2 inline-flex items-center gap-2">{% ico 'image' 'w-5 h-5' %}Imagen de la portada</h3>
+  <div class="glass rounded-2xl p-4 flex items-center gap-4 flex-wrap">
+    {% include 'parciales/_foto.html' with s=portada caja='w-40 h-24 rounded-xl' ic='w-10 h-10 opacity-60' %}
+    <div class="flex gap-2 items-center flex-wrap">
+      <form method="post" action="{% url 'portada_foto' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label class="btn glass text-sm cursor-pointer inline-flex items-center gap-1">
+          {% ico 'image' 'w-4 h-4' %}{% if portada.foto %}Cambiar imagen{% else %}Subir imagen{% endif %}
+          <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" class="hidden" data-autoenviar aria-label="Imagen de la portada">
+        </label>
+      </form>
+      {% if portada.foto %}
+        <form method="post" action="{% url 'portada_quitar' %}">
+          {% csrf_token %}
+          <button class="btn glass text-sm" data-confirmar="¿Quitar la imagen de la portada?">Quitar imagen</button>
+        </form>
+      {% endif %}
+      <span class="text-xs opacity-70">JPG, PNG o WEBP, máximo 3 MB. Se recomienda una foto horizontal.</span>
+    </div>
+  </div>
+
+  {# Servicios y sus tarifas #}
+  <h3 class="text-lg font-extrabold mt-8 mb-2 inline-flex items-center gap-2">{% ico 'wrench' 'w-5 h-5' %}Servicios y sus tarifas</h3>
+  <p class="text-sm opacity-70 mb-3">Primero añade el servicio y luego, dentro de su tarjeta, las tarifas que cobras por él. Las «tarifas generales» aplican a todos los servicios.</p>
+
+  <form method="post" action="{% url 'tarifas' %}" enctype="multipart/form-data" class="glass rounded-2xl p-5 grid sm:grid-cols-4 gap-3 items-start" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="servicio">
+    <div>
+      <label class="inp flex items-center gap-2 cursor-pointer{% if form_servicio.foto.errors %} border-rose-500{% endif %}">
+        {% ico 'image' 'w-5 h-5 shrink-0 opacity-70' %}
+        <span data-nombre-archivo class="truncate opacity-70">Elegir foto (opcional)</span>
+        <input type="file" name="foto" id="{{ form_servicio.foto.id_for_label }}" accept="image/jpeg,image/png,image/webp" class="hidden" data-archivo>
+      </label>
+      {% if form_servicio.foto.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form_servicio.foto.errors.0 }}</p>{% endif %}
+    </div>
+    {% include 'parciales/_campo.html' with campo=form_servicio.nombre icono='tag' ph='Nombre del servicio nuevo' auto='off' %}
+    {% include 'parciales/_campo.html' with campo=form_servicio.precio_base icono='dollar' ph='Precio base' tipo='number' step='0.01' minimo='0' auto='off' %}
+    <button type="submit" class="btn g3 t">+ Añadir servicio</button>
+  </form>
+
+  <div class="mt-4 space-y-4">
+    {% for g in grupos %}
+      {% with s=g.servicio %}
+      <section {% if s %}id="servicio-{{ s.pk }}"{% else %}id="tarifas-generales"{% endif %} class="glass rounded-2xl p-4">
+        {% if s %}
+          <div class="flex justify-between items-center gap-3 flex-wrap">
+            <span class="flex items-center gap-3">
+              {% include 'parciales/_foto.html' with s=s caja='w-14 h-14 rounded-xl' %}
+              <b class="text-lg">{{ s.nombre }}</b>
+            </span>
+            <div class="flex gap-2 items-center flex-wrap">
+              <form method="post" action="{% url 'servicio_foto' s.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label class="btn glass text-sm cursor-pointer inline-flex items-center gap-1">
+                  {% ico 'image' 'w-4 h-4' %}{% if s.foto %}Cambiar foto{% else %}Subir foto{% endif %}
+                  <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" class="hidden" data-autoenviar aria-label="Foto de {{ s.nombre }}">
+                </label>
+              </form>
+              {% if s.foto %}
+                <form method="post" action="{% url 'servicio_foto_quitar' s.pk %}">
+                  {% csrf_token %}
+                  <button class="btn glass text-sm" data-confirmar="¿Quitar la foto de «{{ s.nombre }}»?">Quitar foto</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{% url 'servicio_precio' s.pk %}" class="flex items-center gap-1">
+                {% csrf_token %}
+                <span class="text-sm opacity-70">Precio base $</span>
+                <input name="precio" type="number" step="0.01" min="0.01" value="{{ s.precio_base|numero_limpio }}" class="inp w-28" data-autoenviar aria-label="Precio base de {{ s.nombre }}">
+              </form>
+              <form method="post" action="{% url 'servicio_eliminar' s.pk %}">
+                {% csrf_token %}
+                <button class="btn bg-rose-500 text-white" data-confirmar="¿Eliminar el servicio «{{ s.nombre }}» y todas sus tarifas?">Eliminar servicio</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <b class="text-lg inline-flex items-center gap-2">{% ico 'dollar' 'w-5 h-5' %}Tarifas generales</b>
+          <p class="text-sm opacity-70">Aplican a todos los servicios (por ejemplo, la mano de obra).</p>
+        {% endif %}
+
+        <div class="mt-3 sm:ml-4 sm:pl-4 sm:border-l-2 border-slate-500/30">
+          {% for t in g.tarifas %}
+            <div class="rounded-xl px-3 py-2 mb-2 flex justify-between items-center gap-3 flex-wrap bg-slate-500/10">
+              <span>{{ t.nombre }}</span>
+              <div class="flex gap-2 items-center">
+                <form method="post" action="{% url 'tarifa_precio' t.pk %}" class="flex items-center gap-1">
+                  {% csrf_token %}
+                  <span>$</span>
+                  <input name="precio" type="number" step="0.01" min="0.01" value="{{ t.precio|numero_limpio }}" class="inp w-28" data-autoenviar aria-label="Precio de {{ t.nombre }}">
+                </form>
+                <form method="post" action="{% url 'tarifa_eliminar' t.pk %}">
+                  {% csrf_token %}
+                  <button class="btn bg-rose-500 text-white text-sm" data-confirmar="¿Eliminar la tarifa «{{ t.nombre }}»?">Eliminar</button>
+                </form>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-sm opacity-60 mb-2">{% if s %}Este servicio aún no tiene tarifas. Añade la primera aquí abajo.{% else %}No hay tarifas generales.{% endif %}</p>
+          {% endfor %}
+
+          <form method="post" action="{% url 'tarifas' %}" class="grid sm:grid-cols-3 gap-3 items-start mt-3" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="tarifa">
+            <input type="hidden" name="servicio" value="{% if s %}{{ s.pk }}{% endif %}">
+            {% include 'parciales/_campo.html' with campo=g.form.nombre icono='tag' ph='Nueva tarifa' auto='off' %}
+            {% include 'parciales/_campo.html' with campo=g.form.precio icono='dollar' ph='Precio' tipo='number' step='0.01' minimo='0' auto='off' %}
+            <button type="submit" class="btn g4 t">+ Añadir tarifa{% if s %} a este servicio{% endif %}</button>
+          </form>
+        </div>
+      </section>
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% endblock %}

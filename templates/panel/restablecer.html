@@ -1,0 +1,27 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  <form method="post" class="glass rounded-3xl p-8 space-y-3 max-w-md" novalidate>
+    {% csrf_token %}
+    <h3 class="text-xl font-extrabold inline-flex items-center gap-2">{% ico 'key' 'w-6 h-6' %}Restablecer contraseña</h3>
+    <p class="text-sm opacity-80">Para <b>{{ persona.nombre }}</b> ({{ persona.email }}). Es una clave corta y temporal: la persona deberá crear la suya en cuanto ingrese.</p>
+
+    <div>
+      <label class="inp flex items-center gap-2{% if form.password.errors %} border-rose-500{% endif %}">
+        {% ico 'lock' 'w-5 h-5 shrink-0 opacity-70' %}
+        <input id="{{ form.password.id_for_label }}" name="password" type="text" maxlength="128" autocomplete="off" spellcheck="false" class="font-mono tracking-widest" placeholder="Clave temporal" value="{{ form.password.value|default:'' }}">
+        <button type="button" class="shrink-0 opacity-80 hover:opacity-100" data-generar-clave="#{{ form.password.id_for_label }}" title="Generar otra clave" aria-label="Generar otra clave">{% ico 'refresh' 'w-5 h-5' %}</button>
+      </label>
+      {% if form.password.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form.password.errors.0 }}</p>{% endif %}
+    </div>
+
+    {% include 'parciales/_campo.html' with campo=form.telefono icono='phone' ph='WhatsApp (09…) para enviarle la clave' tipo='tel' auto='off' %}
+    {% if not persona.telefono %}<p class="text-xs text-amber-500">Esta persona no tiene teléfono registrado. Escríbelo para poder enviarle la clave por WhatsApp.</p>{% endif %}
+
+    <div class="flex gap-2">
+      <button type="submit" class="btn g3 t">Asignar contraseña</button>
+      <a href="{% if persona.es_tecnico %}{% url 'personal' %}{% else %}{% url 'clientes' %}{% endif %}" class="btn glass">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

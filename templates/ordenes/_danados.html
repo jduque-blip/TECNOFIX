@@ -1,0 +1,15 @@
+{% load formato %}
+{# Informe de repuestos dañados de la orden (técnico y administrador). #}
+{% if danados %}
+<details class="glass rounded-3xl p-6 space-y-2" id="informe-danados">
+  <summary class="font-extrabold cursor-pointer">Repuestos dañados en esta orden</summary>
+  <table class="w-full text-sm">
+    <thead class="opacity-70 text-left"><tr><th class="py-1">Repuesto</th><th class="text-right">Cant.</th><th>Motivo</th><th>Quién y cuándo</th>{% if user.es_admin %}<th class="text-right">Pérdida</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for d in danados %}
+      <tr class="border-t border-slate-500/20"><td class="py-1">{{ d.producto.nombre }}</td><td class="text-right">{{ d.cantidad }}</td><td>{{ d.motivo }}</td><td class="text-xs opacity-80">{{ d.tecnico.nombre|default:"—" }} · {{ d.fecha|date:"d/m/Y H:i" }}</td>{% if user.es_admin %}<td class="text-right">{{ d.perdida|dinero }}</td>{% endif %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endif %}

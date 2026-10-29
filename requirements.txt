@@ -1,0 +1,5 @@
+# Librerías de TecnoFix. Instalar con:  pip install -r requirements.txt
+Django>=5.2,<5.3
+psycopg[binary]>=3.2
+Pillow>=11.0
+reportlab>=4.2

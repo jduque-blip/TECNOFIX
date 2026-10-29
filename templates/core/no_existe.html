@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% load iconos %}
+
+{% block titulo %}{% if eliminada %}Solicitud eliminada{% else %}No encontrado{% endif %} · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-6xl mx-auto px-4 py-10">
+    <div class="glass rounded-3xl p-8 space-y-3 max-w-md mx-auto text-center">
+      {% ico 'alert' 'w-12 h-12 text-cyan-400 mx-auto' '1.5' %}
+      {% if eliminada %}
+        <h2 class="text-2xl font-extrabold txt">Este equipo o solicitud fue eliminado</h2>
+        <p class="text-sm opacity-80">Ya no está disponible porque se eliminó. Si crees que es un error, escribe a la administración.</p>
+      {% else %}
+        <h2 class="text-2xl font-extrabold txt">No encontramos lo que buscas</h2>
+        <p class="text-sm opacity-80">Puede que se haya eliminado o que el enlace ya no sirva.</p>
+      {% endif %}
+      <a href="{% if user.is_authenticated %}{% url 'panel' %}{% else %}{% url 'inicio' %}{% endif %}" class="btn g1 t w-full py-3 block">Volver a mi panel</a>
+    </div>
+  </main>
+{% endblock %}

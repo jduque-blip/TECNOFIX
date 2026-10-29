@@ -1,0 +1,54 @@
+{% extends 'panel/admin_base.html' %}
+{% load formato iconos %}
+
+{% block panel %}
+  {% include 'inventario/_subtabs.html' with sub='prod' %}
+  <form method="post" action="{% url 'margen_guardar' %}" class="glass rounded-2xl p-4 mb-3 flex items-center gap-3 flex-wrap">
+    {% csrf_token %}
+    <span class="font-bold">Margen de ganancia general %</span>
+    <input name="valor" type="number" step="0.01" min="0" max="500" value="{{ margen_defecto|numero_limpio }}" class="inp w-28" data-autoenviar aria-label="Margen de ganancia general">
+    <span class="text-sm opacity-70">Con él se sugiere el precio de venta: costo de pedido + margen. Cada producto puede tener el suyo.</span>
+  </form>
+
+  <p class="text-xs opacity-70 mb-2">Para <b>editar, desactivar o eliminar</b> un producto, ábrelo haciendo clic en su fila: los botones están arriba en su ficha. Desactivar funciona aunque el producto esté en uso (se conserva el historial); eliminar solo si se creó por error y no tiene movimientos.</p>
+  <div class="flex justify-between items-center gap-3 flex-wrap mb-3">
+    <form method="get" class="flex gap-2 flex-1 min-w-[240px]">
+      <input name="q" class="inp" placeholder="Buscar por nombre, código, marca o categoría" value="{{ q }}" data-buscar autocomplete="off">
+      {% if filtro %}<input type="hidden" name="filtro" value="bajo">{% endif %}{% if categoria %}<input type="hidden" name="categoria" value="{{ categoria.pk }}">{% endif %}
+    </form>
+    <div class="flex gap-2">
+      <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if categoria %}categoria={{ categoria.pk }}{% endif %}" class="btn text-sm {% if not filtro %}g1 t{% else %}glass{% endif %}">Todos</a>
+      <a href="?filtro=bajo{% if q %}&q={{ q|urlencode }}{% endif %}{% if categoria %}&categoria={{ categoria.pk }}{% endif %}" class="btn text-sm inline-flex items-center gap-1 {% if filtro %}g1 t{% else %}glass{% endif %}">{% ico 'alert' 'w-4 h-4' %}Stock bajo{% if n_bajos %} ({{ n_bajos }}){% endif %}</a>
+      <a href="{% url 'producto_nuevo' %}" class="btn g3 t text-sm">+ Nuevo producto</a>
+    </div>
+  </div>
+
+  {% if categorias %}
+  <div class="flex gap-2 flex-wrap mb-3">
+    <a href="{% url 'inventario' %}{% if filtro %}?filtro=bajo{% endif %}" class="btn text-sm {% if not categoria %}g1 t{% else %}glass{% endif %}">Todas las categorías</a>
+    {% for c in categorias %}<a href="?categoria={{ c.pk }}{% if filtro %}&filtro=bajo{% endif %}" class="btn text-sm {% if categoria.pk == c.pk %}g1 t{% else %}glass{% endif %}">{{ c.nombre }}</a>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% for p in pagina %}
+    <a href="{% url 'producto_detalle' p.pk %}" class="glass rounded-2xl p-4 mb-2 flex items-center gap-3 flex-wrap hover:shadow-lg transition">
+      <span class="w-14 h-14 rounded-xl overflow-hidden bg-slate-500/10 flex items-center justify-center shrink-0">
+        {% if p.imagen %}<img src="{{ p.imagen.url }}" alt="" class="w-full h-full object-cover">{% else %}{% ico 'wrench' 'w-6 h-6 opacity-50' %}{% endif %}
+      </span>
+      <div class="flex-1 min-w-[180px]">
+        <b>{{ p.nombre }}</b> {% if not p.activo %}<span class="bg-slate-500 text-white text-xs rounded-full px-2 py-1">Desactivado</span>{% endif %}
+        <div class="text-sm opacity-70">{{ p.codigo }}{% if p.marca %} · {{ p.marca }}{% endif %}{% if p.categoria %} · {{ p.categoria.nombre }}{% endif %}</div>
+      </div>
+      <div class="text-sm text-right">
+        <div>Venta <b>{{ p.precio_venta|dinero }}</b> · Pedido {{ p.costo_pedido|dinero }}</div>
+        <div class="opacity-70">Ganancia {{ p.ganancia|dinero }}{% if p.margen_real is not None %} · {{ p.margen_real }}%{% endif %}{% if p.bajo_objetivo %} <span class="text-amber-500 font-bold" title="Sugerido {{ p.precio_sugerido|dinero }}">· bajo el objetivo</span>{% endif %}</div>
+      </div>
+      <span class="text-sm rounded-full px-3 py-1 font-bold {% if p.stock_bajo %}bg-rose-500 text-white{% else %}bg-emerald-500/20{% endif %}">{{ p.stock }} en stock{% if p.stock_bajo %} · bajo{% endif %}</span>
+    </a>
+  {% empty %}
+    <div class="glass rounded-2xl p-8 text-center opacity-80">
+      {% if q or filtro %}No hay productos que coincidan con la búsqueda.{% else %}Aún no hay productos. Primero registra tus <a class="underline" href="{% url 'proveedores' %}">proveedores</a> y luego añade el primer producto.{% endif %}
+    </div>
+  {% endfor %}
+  {% include 'parciales/_paginador.html' %}
+{% endblock %}

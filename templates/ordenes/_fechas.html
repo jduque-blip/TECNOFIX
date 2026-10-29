@@ -1,0 +1,21 @@
+{% load formato %}
+{# Historial de la fecha de entrega: la primera fecha prometida, cada cambio con su motivo y si se cumplió. #}
+{% if orden.fecha_prometida or cambios_fecha %}
+<details class="glass rounded-3xl p-6 space-y-2" id="fechas-entrega">
+  <summary class="font-extrabold cursor-pointer">Fecha de entrega{% if orden.fecha_estimada %} · <span class="font-normal text-sm opacity-80">{{ orden.fecha_estimada|date:"d/m/Y" }}</span>{% endif %}</summary>
+  <p class="text-sm">
+    {% if orden.fecha_prometida %}Primera fecha prometida: <b>{{ orden.fecha_prometida|date:"d/m/Y" }}</b>.{% endif %}
+    {% if orden.fecha_estimada %}Fecha vigente: <b>{{ orden.fecha_estimada|date:"d/m/Y" }}</b>.{% endif %}
+    {% if orden.estado == 'ENTREGADO' %}
+      {% if orden.entrega_a_tiempo %}<span class="rounded-full px-3 py-1 text-xs font-bold text-white bg-emerald-500">Entregada a tiempo</span>{% elif orden.entrega_a_tiempo is False %}<span class="rounded-full px-3 py-1 text-xs font-bold text-white bg-rose-500">Entregada con retraso</span>{% endif %}
+    {% elif orden.atrasada %}<span class="rounded-full px-3 py-1 text-xs font-bold text-white bg-rose-500">Atrasada</span>{% endif %}
+  </p>
+  {% if cambios_fecha %}
+  <ul class="text-sm space-y-1">
+    {% for c in cambios_fecha %}
+    <li class="rounded-xl bg-slate-500/10 p-2">{{ c.creado_en|date:"d/m/Y" }} · de <b>{{ c.fecha_anterior|date:"d/m/Y" }}</b> a <b>{{ c.fecha_nueva|date:"d/m/Y"|default:"sin fecha" }}</b>{% if c.dias %} ({{ c.dias|stringformat:"+d" }} día{{ c.dias|pluralize }}){% endif %} · <span class="opacity-80">{{ c.motivo }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</details>
+{% endif %}

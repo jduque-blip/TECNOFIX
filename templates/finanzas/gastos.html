@@ -1,0 +1,85 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos formato %}
+
+{% block panel %}
+  <form method="get" class="mb-3 flex gap-2 flex-wrap items-center">
+    <input type="month" name="mes" class="inp" value="{% if mes != 'todos' %}{{ mes }}{% endif %}" onchange="this.form.submit()" aria-label="Mes">
+    <select name="tipo" class="inp" onchange="this.form.submit()" aria-label="Tipo">
+      <option value="">Gastos y pérdidas</option>
+      {% for v, n in tipos %}<option value="{{ v }}"{% if v == tipo %} selected{% endif %}>{{ n }}s</option>{% endfor %}
+    </select>
+    <a href="?mes=todos" class="btn glass text-sm{% if mes == 'todos' %} g1 t{% endif %}">Todo el historial</a>
+    <a href="{% url 'gastos' %}" class="btn glass text-sm">Este mes</a>
+  </form>
+
+  {# Situación del negocio (todo el historial) #}
+  <div class="glass rounded-2xl p-4 mb-3">
+    <div class="grid sm:grid-cols-3 gap-3 items-start">
+      <div><div class="text-sm opacity-70">Dinero en caja ahora</div><div class="text-3xl font-extrabold {% if caja < 0 %}text-rose-500{% else %}text-emerald-500{% endif %}">{{ caja|dinero }}</div><div class="text-xs opacity-60">Capital + todo lo cobrado − todo lo gastado</div></div>
+      <div><div class="text-sm opacity-70">Valor del inventario</div><div class="text-2xl font-extrabold">{{ valor_inventario|dinero }}</div><div class="text-xs opacity-60">Lo que tienes en estantería, a costo de compra</div></div>
+      <form method="post" action="{% url 'capital_guardar' %}" class="space-y-1">
+        {% csrf_token %}
+        <label for="capital" class="text-sm opacity-70">Capital inicial</label>
+        <div class="flex gap-2"><input id="capital" name="capital" type="number" step="0.01" min="0" value="{{ capital|numero_limpio }}" class="inp w-full"><button class="btn glass text-sm">Guardar</button></div>
+        <div class="text-xs opacity-60">Con lo que arrancó el negocio.</div>
+      </form>
+    </div>
+  </div>
+
+  <h3 class="font-extrabold mb-2">Resultado del período</h3>
+  <div class="grid sm:grid-cols-4 gap-3 mb-2">
+    <div class="glass rounded-2xl p-4"><div class="text-sm opacity-70">Ingresos cobrados</div><div class="text-2xl font-extrabold text-emerald-500">{{ ingresos|dinero }}</div></div>
+    <div class="glass rounded-2xl p-4"><div class="text-sm opacity-70">Gastos</div><div class="text-2xl font-extrabold">{{ total_gastos|dinero }}</div><div class="text-xs opacity-60">Incluye lo que compraste a proveedores</div></div>
+    <div class="glass rounded-2xl p-4"><div class="text-sm opacity-70">Otras pérdidas</div><div class="text-2xl font-extrabold text-orange-500">{{ perdidas_manuales|dinero }}</div><div class="text-xs opacity-60">Las que registras tú</div></div>
+    <div class="glass rounded-2xl p-4"><div class="text-sm opacity-70">Utilidad</div><div class="text-2xl font-extrabold {% if utilidad < 0 %}text-rose-500{% endif %}">{{ utilidad|dinero }}</div><div class="text-xs opacity-60">Ingresos − gastos − otras pérdidas</div></div>
+  </div>
+  <p class="text-sm mb-2 opacity-80">Repuestos dañados o faltantes en este período: <b>{{ perdidas_inventario|dinero }}</b>. Es dinero que ya salió de tu caja el día que compraste esos repuestos; aquí solo se muestra para que sepas cuánto se desperdicia y <b>no se resta otra vez</b>. <a href="{% url 'reportes' %}" class="underline">Ver el informe de repuestos dañados</a></p>
+
+  <details class="glass rounded-2xl p-4 mb-4 text-sm">
+    <summary class="font-extrabold cursor-pointer">¿Cómo se calculan estas cifras?</summary>
+    <ul class="mt-3 space-y-2">
+      <li><b>Ingresos cobrados:</b> pagos de clientes ya confirmados por ti (efectivo o transferencia).</li>
+      <li><b>Gastos:</b> lo que paga el taller: arriendo, servicios, sueldos y también las <i>compras de repuestos a proveedores</i> (se registran solas al reponer el inventario).</li>
+      <li><b>Otras pérdidas:</b> pérdidas que tú anotas a mano (por ejemplo, un equipo extraviado).</li>
+      <li><b>Utilidad:</b> ingresos − gastos − otras pérdidas. Es lo que realmente ganó el taller en el período.</li>
+      <li><b>Dinero en caja:</b> capital inicial + todo lo cobrado − todo lo gastado, desde el principio.</li>
+      <li><b>Valor del inventario:</b> lo que tienes en estantería, a lo que te costó comprarlo. No es dinero disponible: es dinero que está en repuestos.</li>
+      <li><b>Repuestos dañados o faltantes:</b> se descuentan del inventario y quedan como informe, pero no restan otra vez porque ya los pagaste al comprarlos.</li>
+    </ul>
+    <p class="mt-3 opacity-80"><b>Ejemplo:</b> empiezas con $3.000. Compras 5 pantallas de $40: el gasto es $200 y la caja queda en $2.800 (el inventario vale $200). Un técnico daña una: la caja sigue en $2.800 y el informe anota $40 de pérdida. Cobras una reparación de $120: la caja sube a $2.920.</p>
+  </details>
+
+  <form method="post" action="{% url 'gasto_nuevo' %}" class="glass rounded-2xl p-4 mb-4 space-y-3" novalidate>
+    {% csrf_token %}
+    <h3 class="font-extrabold">Registrar un gasto o una pérdida</h3>
+    <div class="grid sm:grid-cols-4 gap-3">
+      {{ form.tipo }}{{ form.concepto }}{{ form.monto }}{{ form.fecha }}
+    </div>
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <span class="text-xs opacity-60">Las reposiciones a proveedores y los faltantes de inventario se registran solos.</span>
+      <button type="submit" class="btn g3 t text-sm">Guardar</button>
+    </div>
+  </form>
+
+  {% for g in pagina %}
+    <div class="glass rounded-2xl p-3 mb-2 flex justify-between items-center gap-3 flex-wrap">
+      <div class="min-w-0">
+        <div class="font-bold">{{ g.concepto }}</div>
+        <div class="text-xs opacity-70">{{ g.fecha|date:"d/m/Y" }} ·
+          <span class="rounded-full px-2 py-0.5 text-white font-bold {% if g.tipo == 'PERDIDA' %}bg-orange-500{% else %}bg-slate-500{% endif %}">{{ g.get_tipo_display }}</span>
+          {% if g.automatico %}· automático{% endif %}{% if g.usuario %}· {{ g.usuario.nombre }}{% endif %}
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <b class="text-lg">{{ g.monto|dinero }}</b>
+        {% if not g.automatico %}
+          <a href="{% url 'gasto_editar' g.pk %}" class="btn glass text-sm">Editar</a>
+          <form method="post" action="{% url 'gasto_eliminar' g.pk %}">{% csrf_token %}<button class="btn glass text-sm text-rose-500" data-confirmar="¿Eliminar este registro?">Eliminar</button></form>
+        {% endif %}
+      </div>
+    </div>
+  {% empty %}
+    <p class="glass rounded-2xl p-6 text-center opacity-70">No hay gastos ni pérdidas en este período.</p>
+  {% endfor %}
+  {% include 'parciales/_paginador.html' %}
+{% endblock %}

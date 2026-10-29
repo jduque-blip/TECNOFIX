@@ -1,0 +1,48 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  {% if pagos_por_validar %}
+    <div class="bg-amber-500/20 border border-amber-500/60 rounded-xl p-3 text-sm mb-3 inline-flex items-center gap-2">{% ico 'alert' 'w-4 h-4' %}{{ pagos_por_validar }} comprobante{{ pagos_por_validar|pluralize }} de pago por validar.</div>
+  {% endif %}
+  {% if sin_tecnico %}
+    <div class="bg-amber-500/20 border border-amber-500/60 rounded-xl p-3 text-sm mb-3 inline-flex items-center gap-2">{% ico 'alert' 'w-4 h-4' %}{{ sin_tecnico }} orden{{ sin_tecnico|pluralize:",es" }} sin técnico asignado.</div>
+  {% endif %}
+
+  <form method="get" class="mb-3 flex gap-2 flex-wrap">
+    <input name="q" class="inp flex-1 min-w-[12rem]" placeholder="Buscar por número, cliente o equipo" value="{{ q }}" data-buscar autocomplete="off">
+    <select name="estado" class="inp" onchange="this.form.submit()" aria-label="Filtrar por estado">
+      <option value="">Todos los estados</option>
+      {% for valor, nombre in estados %}
+        <option value="{{ valor }}"{% if valor == estado %} selected{% endif %}>{{ nombre }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <div class="flex gap-2 flex-wrap mb-3 text-sm">
+    <a href="{% url 'ordenes' %}" class="btn {% if not estado %}g1 t{% else %}glass{% endif %}">Todas</a>
+    <a href="{% url 'ordenes' %}?estado=CANCELADA" class="btn {% if estado == 'CANCELADA' %}g1 t{% else %}glass{% endif %}">Canceladas por el cliente ({{ n_canceladas }})</a>
+    <a href="{% url 'ordenes' %}?estado=RECHAZADA" class="btn {% if estado == 'RECHAZADA' %}g1 t{% else %}glass{% endif %}">Rechazadas ({{ n_rechazadas }})</a>
+  </div>
+
+  {% for o in pagina %}
+    <a href="{% url 'orden_admin' o.pk %}" class="glass rounded-2xl p-4 mb-2 flex justify-between items-center gap-3 flex-wrap hover:-translate-y-0.5 transition">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <b>#{{ o.pk }} · {{ o.modelo }}</b>
+          {% include 'parciales/_estado.html' with orden=o %}
+          {% if o.prioridad != 'NORMAL' %}<span class="rounded-full px-3 py-1 text-xs font-bold bg-orange-500 text-white">{{ o.get_prioridad_display }}</span>{% endif %}
+        </div>
+        <div class="text-sm opacity-70">{{ o.servicio.nombre }} · Cliente: {{ o.cliente.nombre }}</div>
+      </div>
+      <div class="text-sm text-right opacity-80">
+        <div>{% if o.tecnico %}Técnico: {{ o.tecnico.nombre }}{% else %}<span class="text-amber-500 font-semibold">Sin técnico</span>{% endif %}</div>
+        {% if o.fecha_estimada %}<div>Entrega: {{ o.fecha_estimada|date:"d/m/Y" }}</div>{% endif %}
+      </div>
+    </a>
+  {% empty %}
+    <p class="opacity-60">{% if q or estado %}No hay órdenes que coincidan con el filtro.{% else %}Aún no hay órdenes. Aparecerán cuando los clientes soliciten servicios.{% endif %}</p>
+  {% endfor %}
+
+  {% include 'parciales/_paginador.html' %}
+{% endblock %}

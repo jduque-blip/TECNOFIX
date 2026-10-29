@@ -1,0 +1,210 @@
+{% extends 'base.html' %}{% load static %}
+{% load iconos %}
+
+{% block titulo %}Equipo #{{ orden.pk }} · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-4xl mx-auto px-4 py-6 space-y-5" data-secciones="equipo-{{ user.rol|lower }}">
+    <a href="{% url 'panel' %}" class="btn glass inline-flex items-center gap-2 text-sm">← Volver a mi panel</a>
+
+    <div class="glass rounded-3xl p-6">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 class="text-2xl font-extrabold">#{{ orden.pk }} · {{ orden.modelo }}</h2>
+        {% include 'parciales/_estado.html' %}
+      </div>
+      <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 text-sm">
+        <div><dt class="opacity-60">Servicio</dt><dd class="font-semibold">{{ orden.servicio.nombre }}</dd></div>
+        <div><dt class="opacity-60">Recibida</dt><dd class="font-semibold">{{ orden.creada_en|date:"d/m/Y H:i" }}</dd></div>
+        {% if user.es_cliente %}
+          <div><dt class="opacity-60">Técnico</dt><dd class="font-semibold">{{ orden.tecnico.nombre|default:"Aún sin asignar" }}</dd></div>
+        {% else %}
+          <div><dt class="opacity-60">Cliente</dt><dd class="font-semibold">{{ orden.cliente.nombre }}{% if orden.cliente.telefono %} · {{ orden.cliente.telefono }}{% endif %}</dd></div>
+        {% endif %}
+        <div><dt class="opacity-60">Entrega estimada</dt><dd class="font-semibold">{{ orden.fecha_estimada|date:"d/m/Y"|default:"Por definir" }}</dd></div>
+      </dl>
+      <div class="mt-4">
+        <div class="opacity-60 text-sm">Problema</div>
+        <p class="whitespace-pre-line">{{ orden.problema }}</p>
+      </div>
+      {% if contacto %}
+        <div class="mt-4">
+          <a href="{% url 'chat' contacto.pk %}?orden={{ orden.pk }}" class="btn g2 t text-sm inline-flex items-center gap-2">{% ico 'message' 'w-4 h-4' %}Contactar a {{ contacto.nombre }}{% if contacto.es_admin %} (administración){% endif %}</a>
+        </div>
+      {% endif %}
+      {% if user.es_cliente %}
+        {% if orden.cliente_puede_modificar %}
+          <div class="flex gap-2 mt-4 flex-wrap">
+            <a href="{% url 'equipo_editar' orden.pk %}" class="btn g3 t text-sm">Editar solicitud / añadir fotos</a>
+            <form method="post" action="{% url 'equipo_eliminar' orden.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn glass text-sm text-rose-500" data-confirmar="¿Eliminar esta solicitud? Esta acción no se puede deshacer.">Eliminar</button>
+            </form>
+          </div>
+          <p class="text-xs opacity-60 mt-2">Puedes corregirla o eliminarla hasta que se asigne un técnico.</p>
+        {% elif orden.estado != 'ENTREGADO' and not orden.congelada %}
+          <p class="text-xs opacity-60 mt-4">Ya tiene técnico asignado, por eso no se puede modificar ni eliminar.</p>
+        {% endif %}
+        {% if puede_cancelar %}
+          <details class="mt-4 text-sm">
+            <summary class="cursor-pointer underline text-rose-500">Cancelar este equipo</summary>
+            <form method="post" action="{% url 'equipo_cancelar' orden.pk %}" class="space-y-2 mt-2">
+              {% csrf_token %}
+              <p class="opacity-80">Tu equipo ya está siendo atendido. Si cancelas, solo pagas por el trabajo ya hecho: {% if orden.estado == 'REPARACION' %}la mano de obra{% else %}el diagnóstico (no la reparación){% endif %}{% if cargo_cancelar > 0 %} (<b>${{ cargo_cancelar }}</b> más IVA){% endif %} y te devolvemos el equipo sin reparar. Lo que ya hayas aceptado en un presupuesto también se paga.</p>
+              <input name="motivo" maxlength="200" class="inp w-full" placeholder="Motivo (opcional)" aria-label="Motivo de la cancelación">
+              <button class="btn glass text-sm text-rose-500" data-confirmar="¿Cancelar tu equipo? Pagarás lo indicado y retirarás el equipo sin reparar.">Sí, cancelar mi equipo</button>
+            </form>
+          </details>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if user.es_tecnico %}
+    <section class="glass rounded-3xl p-4 sm:p-5 space-y-3 sticky top-2 z-20" aria-label="Mesa de trabajo">
+      {% if siguiente_paso %}
+      <div class="flex items-start gap-3 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 p-3">
+        {% ico 'rocket' 'w-6 h-6 shrink-0 text-cyan-400' %}
+        <div><div class="text-xs font-bold uppercase tracking-wide opacity-70">Qué sigue</div><p class="text-sm font-semibold">{{ siguiente_paso }}</p></div>
+      </div>
+      {% endif %}
+      <div class="flex gap-2 flex-wrap items-center text-sm">
+        <a href="#presupuestos" data-ir-seccion class="btn glass">Presupuesto</a>
+        <a href="#piezas" data-ir-seccion class="btn glass">Piezas</a>
+        <a href="#repuestos-usados" data-ir-seccion class="btn glass">Repuestos usados</a>
+        <a href="#repuesto-danado" data-ir-seccion class="btn glass">Reportar daño</a>
+        <span class="flex-1"></span>
+        <button type="button" class="btn glass" data-abrir-todo>Abrir todo</button>
+        <button type="button" class="btn glass" data-cerrar-todo>Minimizar todo</button>
+      </div>
+    </section>
+    {% endif %}
+    {% include 'ordenes/_cierre.html' %}
+    {% include 'ordenes/_fechas.html' %}
+
+    {% if user.es_tecnico and orden.estado != 'ENTREGADO' and not orden.congelada %}
+      <div class="glass rounded-3xl p-6 space-y-5">
+        {% if orden.piezas_sin_usar %}<p class="text-sm rounded-xl bg-emerald-500/20 p-3">Ya llegó la pieza. Antes de marcar «Listo», regístrala como usada en «Repuestos usados».</p>{% endif %}
+        {% if form_estado.fields.estado.choices %}
+        <form method="post" action="{% url 'tecnico_estado' orden.pk %}" class="flex gap-2 flex-wrap items-end">
+          {% csrf_token %}
+          <div class="flex-1 min-w-[12rem]">
+            <label for="estado-tecnico" class="font-extrabold inline-flex items-center gap-2 mb-2">{% ico 'wrench' 'w-5 h-5' %}Estado de la orden (ahora: {{ orden.get_estado_display }})</label>
+            <select id="estado-tecnico" name="estado" class="inp w-full">
+              {% for valor, nombre in form_estado.fields.estado.choices %}<option value="{{ valor }}">{{ nombre }}</option>{% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn g1 t">Avanzar estado</button>
+        </form>
+        <p class="text-xs opacity-60 -mt-3">Solo puedes avanzar: Diagnóstico → Reparación → Listo. La entrega la autoriza el administrador cuando el pago esté confirmado.</p>
+        {% else %}
+        {% if orden.motivo_sin_avance %}
+        <p class="text-sm rounded-xl bg-amber-500/20 p-3"><b>Estado: {{ orden.get_estado_display }}.</b> {{ orden.motivo_sin_avance }}</p>
+        {% else %}
+        <p class="text-sm"><b>La orden está en «{{ orden.get_estado_display }}».</b> Ya no hay más estados a los que avanzar: la entrega la autoriza el administrador cuando el pago esté confirmado.</p>
+        {% endif %}
+        {% endif %}
+        {% if form_retroceso.fields.estado.choices %}
+        <details class="text-sm">
+          <summary class="cursor-pointer underline">¿Te equivocaste de estado? Pide volver atrás</summary>
+          {% for sol in solicitudes %}{% if sol.estado == 'PENDIENTE' %}<p class="mt-2 rounded-xl bg-amber-500/20 p-2">Solicitud pendiente: volver a {{ sol.get_estado_pedido_display }}. Esperando al administrador.</p>{% endif %}{% endfor %}
+          <form method="post" action="{% url 'tecnico_retroceso' orden.pk %}" class="space-y-2 mt-2">
+            {% csrf_token %}
+            <select name="estado" class="inp w-full" aria-label="Estado al que quieres volver">
+              {% for valor, nombre in form_retroceso.fields.estado.choices %}<option value="{{ valor }}">{{ nombre }}</option>{% endfor %}
+            </select>
+            <input name="motivo" maxlength="300" class="inp w-full" placeholder="Motivo (por ejemplo: marqué reparación sin querer)" aria-label="Motivo">
+            <button type="submit" class="btn glass text-sm">Enviar solicitud al administrador</button>
+          </form>
+        </details>
+        {% endif %}
+        {% for sol in solicitudes %}{% if sol.estado != 'PENDIENTE' %}<p class="text-xs opacity-70">Solicitud de volver a {{ sol.get_estado_pedido_display }}: <b>{{ sol.get_estado_display }}</b>{% if sol.respuesta %} · {{ sol.respuesta }}{% endif %}</p>{% endif %}{% endfor %}
+
+        <details id="subir-fotos" class="rounded-2xl bg-slate-500/10 p-4">
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'camera' 'w-5 h-5' %}Subir fotos del avance o de cómo quedó</summary>
+        <form method="post" action="{% url 'tecnico_fotos' orden.pk %}" enctype="multipart/form-data" class="space-y-2 mt-3">
+          {% csrf_token %}
+          <label class="inp flex items-center gap-2 cursor-pointer">
+            {% ico 'camera' 'w-5 h-5 shrink-0 opacity-70' %}
+            <span data-nombre-archivo class="truncate opacity-70">Elegir fotos (de a una o varias, hasta 8 en total)</span>
+            <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple class="hidden" data-fotos data-vista="#vista-avance" data-aviso="#aviso-avance" data-max="8" data-max-mb="3">
+          </label>
+          <div id="vista-avance" class="flex gap-3 flex-wrap pt-1"></div>
+          <p id="aviso-avance" class="text-xs text-rose-500 px-1" role="status"></p>
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="text-xs opacity-60">JPG, PNG o WEBP · 3 MB cada una · el cliente las verá</span>
+            <button type="submit" class="btn g3 t text-sm">Subir fotos</button>
+          </div>
+        </form>
+        </details>
+
+        <details id="agregar-nota" class="rounded-2xl bg-slate-500/10 p-4">
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'clipboard' 'w-5 h-5' %}Agregar una nota</summary>
+        <form method="post" action="{% url 'tecnico_nota' orden.pk %}" class="space-y-2 mt-3">
+          {% csrf_token %}
+          <label for="nota_texto" class="sr-only">Nota</label>
+          {{ form_nota.texto }}
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <label class="text-sm inline-flex items-center gap-2"><input type="checkbox" name="visible_cliente" checked> Visible para el cliente</label>
+            <button type="submit" class="btn g3 t text-sm">Guardar nota</button>
+          </div>
+        </form>
+        </details>
+      </div>
+    {% endif %}
+
+    {% include 'ordenes/_presupuestos.html' %}
+    {% include 'ordenes/_pagos.html' %}
+    {% if not user.es_cliente %}{% include 'ordenes/_danados.html' %}{% endif %}
+
+    {% if notas %}
+      <details id="notas" class="glass rounded-3xl p-6" >
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'message' 'w-5 h-5' %}Notas</summary>
+        <ul class="space-y-3 text-sm">
+          {% for n in notas %}
+            <li><div class="opacity-60 text-xs">{{ n.creada_en|date:"d/m/Y H:i" }} · {{ n.autor.nombre|default:"Técnico" }}{% if user.es_tecnico and not n.visible_cliente %} · <b>interna</b>{% endif %}</div><p class="whitespace-pre-line">{{ n.texto }}</p></li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+
+    {% if orden.estado != 'ENTREGADO' and fotos_avance %}
+      <details id="fotos-avance" class="glass rounded-3xl p-6" >
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'camera' 'w-5 h-5' %}Fotos del avance</summary>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {% for f in fotos_avance %}
+            <div class="relative">
+              <a href="{{ f.imagen.url }}" target="_blank" rel="noopener"><img src="{{ f.imagen.url }}" alt="Avance {{ forloop.counter }} de {{ orden.modelo }}" loading="lazy" class="w-full h-32 object-cover rounded-xl"></a>
+              {% if user.es_tecnico %}
+                <form method="post" action="{% url 'tecnico_foto_quitar' orden.pk f.pk %}" class="absolute top-1 right-1">
+                  {% csrf_token %}
+                  <button type="submit" class="bg-black/70 text-white rounded-full w-7 h-7 leading-none" aria-label="Quitar foto" data-confirmar="¿Quitar esta foto?">×</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </details>
+    {% endif %}
+
+    {% if orden.estado != 'ENTREGADO' and orden.fotos.all %}
+      <details id="fotos-equipo" class="glass rounded-3xl p-6" >
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'camera' 'w-5 h-5' %}Fotos del equipo</summary>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {% for f in orden.fotos.all %}
+            <a href="{{ f.imagen.url }}" target="_blank" rel="noopener"><img src="{{ f.imagen.url }}" alt="Foto {{ forloop.counter }} de {{ orden.modelo }}" loading="lazy" class="w-full h-32 object-cover rounded-xl"></a>
+          {% endfor %}
+        </div>
+      </details>
+    {% endif %}
+
+    <details id="historial" class="glass rounded-3xl p-6" >
+      <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'clipboard' 'w-5 h-5' %}Historial</summary>
+      <ul class="space-y-2 text-sm">
+        {% for h in historial %}
+          <li class="flex gap-3"><span class="opacity-60 whitespace-nowrap">{{ h.fecha|date:"d/m/Y H:i" }}</span><span>{{ h.evento }}{% if h.usuario %} <span class="opacity-60">· {{ h.usuario.nombre }}</span>{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    </details>
+  </main>
+  <script src="{% static 'js/presupuesto.js' %}?v=8"></script>
+  <script src="{% static 'js/secciones.js' %}?v=1"></script>
+{% endblock %}

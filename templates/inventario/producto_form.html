@@ -1,0 +1,104 @@
+{% extends 'panel/admin_base.html' %}
+{% load formato iconos static %}
+
+{% block panel %}
+  {% include 'inventario/_subtabs.html' with sub='prod' %}
+  <h3 class="text-lg font-extrabold mb-3">{% if producto %}Editar «{{ producto.nombre }}»{% else %}Nuevo producto{% endif %}</h3>
+  {% if not hay_proveedores %}
+    <p class="glass rounded-2xl p-3 mb-3 text-sm">Todavía no hay proveedores. Puedes crear el producto sin ellos, pero para reponer stock necesitarás <a class="underline" href="{% url 'proveedores' %}">registrar uno</a>.</p>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data" class="glass rounded-2xl p-5 space-y-4" novalidate data-precio data-margen-general="{{ margen_defecto|numero_limpio }}" data-nuevo="{% if producto %}0{% else %}1{% endif %}">
+    {% csrf_token %}
+    {% if pieza %}
+      <input type="hidden" name="pieza" value="{{ pieza.pk }}">
+      <p class="rounded-xl bg-emerald-500/20 p-3 text-sm">Datos tomados de la pieza «{{ pieza.nombre_pieza }}» de la orden #{{ pieza.orden_id }}: proveedor, costo y precio ya están llenos. Solo falta el código, la marca y la foto (y revisar lo demás). Al guardar, la pieza se da por llegada: entra al inventario, la orden pasa a reparación y se avisa al técnico y al cliente.</p>
+    {% endif %}
+    <div class="grid sm:grid-cols-2 gap-3">
+      {% include 'parciales/_campo.html' with campo=form.nombre icono='tag' ph='Nombre del producto' %}
+      {% include 'parciales/_campo.html' with campo=form.codigo icono='tag' ph='Código (ej. SSD-480)' %}
+      {% include 'parciales/_campo.html' with campo=form.marca icono='tag' ph='Marca (opcional)' %}
+      <div>
+        <select name="categoria" id="{{ form.categoria.id_for_label }}" class="inp" aria-label="Categoría" data-categoria>
+          <option value="">Sin categoría</option>
+          {% for c in form.categoria.field.queryset %}<option value="{{ c.pk }}"{% if form.categoria.value|stringformat:"s" == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+        </select>
+        {% if form.categoria.errors %}<p class="text-xs text-rose-500 px-1">{{ form.categoria.errors.0 }}</p>{% endif %}
+        <p class="text-xs opacity-60 px-1 mt-1"><a class="underline" href="{% url 'proveedores' %}">Crear o quitar categorías</a></p>
+      </div>
+    </div>
+    <div>
+      <div class="flex justify-between items-end gap-3 flex-wrap">
+        <b class="text-sm">Proveedores y el precio que cobra cada uno (el segundo es opcional)</b>
+        <button type="button" class="text-xs underline hidden" data-ver-todos>Mostrar todos los proveedores</button>
+      </div>
+      <p class="text-xs opacity-60 px-1" data-aviso-proveedores>Elige primero la categoría y aquí aparecerán los proveedores que la venden.</p>
+      <div class="grid sm:grid-cols-2 gap-3 mt-2">
+        {% for n in '12' %}
+          <div class="rounded-xl bg-slate-500/10 p-3 space-y-2">
+            {% if n == '1' %}{% with c=form.proveedor1 p=form.precio1 %}
+              <select name="{{ c.html_name }}" id="{{ c.id_for_label }}" class="inp" aria-label="Proveedor 1" data-proveedor>
+                <option value="">— Sin proveedor —</option>
+                {% for v in c.field.queryset %}<option value="{{ v.pk }}" data-cats="{% for k in v.categorias.all %}{{ k.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% if c.value|stringformat:"s" == v.pk|stringformat:"s" %} selected{% endif %}>{{ v.etiqueta }}</option>{% endfor %}
+              </select>
+              {% if c.errors %}<p class="text-xs text-rose-500 px-1">{{ c.errors.0 }}</p>{% endif %}
+              {% include 'parciales/_campo.html' with campo=p icono='dollar' ph='Precio que cobra' tipo='number' step='0.01' minimo='0' %}
+            {% endwith %}{% else %}{% with c=form.proveedor2 p=form.precio2 %}
+              <select name="{{ c.html_name }}" id="{{ c.id_for_label }}" class="inp" aria-label="Proveedor 2" data-proveedor>
+                <option value="">— Sin proveedor —</option>
+                {% for v in c.field.queryset %}<option value="{{ v.pk }}" data-cats="{% for k in v.categorias.all %}{{ k.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% if c.value|stringformat:"s" == v.pk|stringformat:"s" %} selected{% endif %}>{{ v.etiqueta }}</option>{% endfor %}
+              </select>
+              {% if c.errors %}<p class="text-xs text-rose-500 px-1">{{ c.errors.0 }}</p>{% endif %}
+              {% include 'parciales/_campo.html' with campo=p icono='dollar' ph='Precio que cobra' tipo='number' step='0.01' minimo='0' %}
+            {% endwith %}{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-3">
+      <div>
+        <label class="text-xs opacity-70 px-1">Costo de pedido (el del proveedor más barato)</label>
+        {% include 'parciales/_campo.html' with campo=form.costo_pedido icono='dollar' ph='Se calcula con los proveedores' tipo='number' step='0.01' minimo='0' %}
+      </div>
+      <div>
+        <label class="text-xs opacity-70 px-1">Margen de ganancia % (general: {{ margen_defecto|numero_limpio }}%)</label>
+        {% include 'parciales/_campo.html' with campo=form.margen_propio icono='chart' ph='Margen' tipo='number' step='0.01' minimo='0' %}
+      </div>
+      <div>
+        <label class="text-xs opacity-70 px-1">Costo de venta (al cliente)</label>
+        {% include 'parciales/_campo.html' with campo=form.precio_venta icono='dollar' ph='Se calcula solo' tipo='number' step='0.01' minimo='0' %}
+        <p class="text-xs px-1 mt-1" data-sugerencia aria-live="polite"></p>
+      </div>
+      <div>
+        <label class="text-xs opacity-70 px-1">Stock mínimo (avisa al llegar a este número)</label>
+        {% include 'parciales/_campo.html' with campo=form.stock_minimo icono='alert' ph='Stock mínimo' tipo='number' step='1' minimo='0' %}
+      </div>
+      {% if not producto and not pieza %}
+      <div>
+        <label class="text-xs opacity-70 px-1">Stock inicial (déjalo en 0 si recién empiezas; luego lo subes con «Reponer»)</label>
+        {% include 'parciales/_campo.html' with campo=form.stock_inicial icono='clipboard' ph='Unidades en existencia' tipo='number' step='1' minimo='0' %}
+      </div>
+      {% elif producto %}
+      <p class="text-xs opacity-70 px-1 self-end">Para cambiar las unidades en existencia usa «Ajustar stock» en el detalle del producto: así queda registrado en el historial.</p>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-4 flex-wrap">
+      <label class="inp flex items-center gap-2 cursor-pointer max-w-xs{% if form.imagen.errors %} border-rose-500{% endif %}">
+        {% ico 'image' 'w-5 h-5 shrink-0 opacity-70' %}
+        <span data-nombre-archivo class="truncate opacity-70">{% if producto.imagen %}Cambiar imagen{% else %}Elegir imagen (opcional){% endif %}</span>
+        <input type="file" name="imagen" id="{{ form.imagen.id_for_label }}" accept="image/jpeg,image/png,image/webp" class="hidden" data-archivo>
+      </label>
+      {% if producto %}
+      <label class="inline-flex items-center gap-2"><input type="checkbox" name="activo" {% if form.activo.value %}checked{% endif %}> Producto activo</label>
+      {% else %}<input type="hidden" name="activo" value="on">{% endif %}
+    </div>
+    {% if form.imagen.errors %}<p class="text-xs text-rose-500 px-1">{{ form.imagen.errors.0 }}</p>{% endif %}
+
+    <div class="flex gap-2">
+      <button type="submit" class="btn g3 t">{% if producto %}Guardar cambios{% else %}Crear producto{% endif %}</button>
+      <a href="{% if producto %}{% url 'producto_detalle' producto.pk %}{% else %}{% url 'inventario' %}{% endif %}" class="btn glass">Cancelar</a>
+    </div>
+  </form>
+  <script src="{% static 'js/precio.js' %}?v=2"></script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% load formato %}
+{# Aviso cuando la orden fue cancelada por el cliente o rechazada por el administrador. Lo ven el cliente y el técnico. #}
+{% if orden.congelada %}
+<div class="rounded-3xl p-6 border border-rose-500/40 bg-rose-500/10 space-y-2" id="orden-cerrada">
+  <h3 class="font-extrabold">{% if user.es_tecnico %}Orden rechazada{% elif orden.estado == 'CANCELADA' %}Orden cancelada{% else %}Orden rechazada por la administración{% endif %}</h3>
+  {% if orden.motivo_cierre %}<p class="text-sm"><b>Motivo:</b> {{ orden.motivo_cierre }}</p>{% endif %}
+  {% if user.es_tecnico %}
+    <p class="text-sm">Ya no puedes hacer cambios en esta orden. Si el administrador acuerda algo con el cliente y la reabre, te avisaremos para que continúes.</p>
+  {% elif user.es_cliente %}
+    <p class="text-sm">Si el precio no te convenció o quieres revisar otra opción, habla con la administración: pueden acordar un nuevo presupuesto o un descuento y reabrir tu equipo.</p>
+    {% if contacto %}<a href="{% url 'chat' contacto.pk %}?orden={{ orden.pk }}" class="btn g1 t text-sm inline-block">Hablar con la administración</a>{% endif %}
+  {% endif %}
+</div>
+{% elif orden.resultado %}
+<div class="rounded-3xl p-4 border border-rose-500/40 bg-rose-500/10 text-sm" id="orden-cerrada">
+  <b>{% if orden.resultado == 'CANCELADA' and not user.es_tecnico %}Esta orden fue cancelada{% elif orden.resultado == 'CANCELADA' %}Esta orden fue rechazada{% else %}Esta orden fue rechazada{% endif %}.</b>
+  {% if orden.estado == 'ENTREGADO' %}El equipo ya se devolvió al cliente.{% else %}El equipo está listo para devolverse.{% endif %}
+  {% if orden.motivo_cierre %}<br>Motivo: {{ orden.motivo_cierre }}{% endif %}
+</div>
+{% endif %}

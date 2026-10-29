@@ -1,0 +1,30 @@
+{% load iconos %}<!-- Ventana para solicitar un servicio. Con errores, la página la abre de nuevo con lo escrito -->
+<div id="modal-solicitud" class="{% if modal_abierto != 'modal-solicitud' %}hidden {% endif %}fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" data-modal>
+  <form method="post" action="{% url 'solicitar' %}" enctype="multipart/form-data" novalidate
+        class="rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg p-8 space-y-3 max-h-[90vh] overflow-y-auto" style="background:var(--mo);border:1px solid var(--bd)">
+    {% csrf_token %}
+    <h3 class="text-2xl font-extrabold txt">Solicitar servicio</h3>
+    <div>
+      {{ form_solicitud.servicio }}
+      {% if form_solicitud.servicio.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form_solicitud.servicio.errors.0 }}</p>{% endif %}
+    </div>
+    {% include 'parciales/_campo.html' with campo=form_solicitud.modelo icono='laptop' ph='Modelo del equipo (ej. HP Pavilion 15)' auto='off' %}
+    <div>
+      {{ form_solicitud.problema }}
+      {% if form_solicitud.problema.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form_solicitud.problema.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label class="inp flex items-center gap-2 cursor-pointer{% if form_solicitud.fotos.errors %} border-rose-500{% endif %}">
+        {% ico 'camera' 'w-5 h-5 shrink-0 opacity-70' %}
+        <span data-nombre-archivo class="truncate opacity-70">Añadir fotos del equipo (opcional, hasta 4)</span>
+        <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple class="hidden" data-fotos data-vista="#vista-fotos" data-aviso="#aviso-fotos" data-max="4" data-max-mb="3">
+      </label>
+      <div id="vista-fotos" class="flex gap-3 flex-wrap mt-3 pt-1"></div>
+      <p id="aviso-fotos" class="text-xs text-rose-500 mt-1 px-1" role="status"></p>
+      {% if form_solicitud.fotos.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form_solicitud.fotos.errors.0 }}</p>{% endif %}
+      <p class="text-xs opacity-60 mt-1 px-1">JPG, PNG o WEBP, máximo 3 MB cada una. Puedes elegirlas de a una y se van sumando.</p>
+      {% if form_solicitud.errors and not form_solicitud.fotos.errors %}<p class="text-xs text-amber-500 px-1">Si habías elegido fotos, vuelve a añadirlas.</p>{% endif %}
+    </div>
+    <button type="submit" class="btn g1 t w-full py-3">Enviar solicitud</button>
+  </form>
+</div>

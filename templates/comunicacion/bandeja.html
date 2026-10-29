@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load iconos %}
+
+{% block titulo %}Mensajes · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-3">
+    <a href="{% url 'panel' %}" class="btn glass text-sm inline-block">← Volver a mi panel</a>
+    <h2 class="text-2xl font-extrabold inline-flex items-center gap-2">{% ico 'message' 'w-6 h-6' %}Mensajes</h2>
+
+    {% for f in filas %}
+      <a href="{% url 'chat' f.otro.pk %}" class="glass rounded-2xl p-4 flex gap-3 items-center hover:-translate-y-0.5 transition">
+        <span class="w-10 h-10 rounded-full g1 text-white flex items-center justify-center font-bold shrink-0">{{ f.otro.nombre|slice:":1"|upper }}</span>
+        <span class="flex-1 min-w-0">
+          <b>{{ f.otro.nombre }}</b> <span class="text-xs opacity-60">{{ f.otro.get_rol_display }}</span>
+          <span class="block text-sm opacity-70 truncate">{% if f.ultimo.de_id == user.pk %}Tú: {% endif %}{{ f.ultimo.texto }}</span>
+        </span>
+        {% if f.sin_leer %}<span class="bg-rose-500 text-white text-xs font-bold rounded-full px-2 py-1">{{ f.sin_leer }}</span>{% endif %}
+      </a>
+    {% empty %}
+      <p class="opacity-60">Aún no tienes conversaciones.</p>
+    {% endfor %}
+
+    {% if nuevos %}
+      <h3 class="font-extrabold pt-3">Iniciar una conversación</h3>
+      <div class="flex gap-2 flex-wrap">
+        {% for u in nuevos %}
+          <a href="{% url 'chat' u.pk %}" class="btn glass text-sm">{{ u.nombre }} <span class="opacity-60">· {{ u.get_rol_display }}</span></a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </main>
+{% endblock %}

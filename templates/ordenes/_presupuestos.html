@@ -1,0 +1,361 @@
+{% load iconos formato l10n %}
+{# Presupuestos y piezas de una orden. Lo usan el cliente, el técnico y el administrador (este último solo lee y marca piezas). #}
+{% if presupuestos or puede_presupuestar or piezas or user.es_tecnico %}
+<details class="glass rounded-3xl p-6 space-y-4" id="presupuestos" open>
+  <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'dollar' 'w-5 h-5' %}{% if factura.lineas %}Factura general{% else %}Presupuesto{% endif %}</summary>
+
+  {% if orden.tiene_descuento %}
+  <div class="rounded-2xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-sm">
+    <b>Descuento acordado:{% if orden.descuento_sin_mano %} sin cobrar la mano de obra{% if orden.descuento > 0 %} y{% endif %}{% endif %}{% if orden.descuento > 0 %} {{ orden.descuento|dinero }}{% endif %}</b>{% if orden.descuento_motivo %} · {{ orden.descuento_motivo }}{% endif %}.
+    {% if factura.descuento %}Ya está restado en la factura (el IVA baja en proporción).{% else %}Se restará de la factura cuando el cliente acepte el presupuesto.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if factura.lineas %}
+  <div class="rounded-2xl border border-emerald-500/40 p-4 text-sm">
+    <table class="w-full">
+      <thead class="opacity-70 text-left"><tr><th class="py-1">Detalle</th><th class="text-right">Cant.</th><th class="text-right">Precio</th><th class="text-right">Subtotal</th></tr></thead>
+      <tbody>
+        {% for l in factura.lineas %}
+        <tr class="border-t border-slate-500/20"><td class="py-1">{{ l.detalle }} <span class="text-xs opacity-60">({{ l.tipo|lower }})</span></td><td class="text-right">{{ l.cantidad }}</td><td class="text-right">{{ l.precio_unit|dinero }}</td><td class="text-right">{{ l.subtotal|dinero }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t border-slate-500/30"><td colspan="3" class="text-right pt-1 opacity-80">Subtotal</td><td class="text-right pt-1">{{ factura.subtotal|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right opacity-80">IVA</td><td class="text-right">{{ factura.iva|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right font-extrabold">Total a pagar</td><td class="text-right font-extrabold text-lg">{{ factura.total|dinero }}</td></tr>
+      </tfoot>
+    </table>
+    {% if orden.espera_repuesto %}<p class="mt-2 rounded-xl bg-amber-500/20 p-2 text-xs">Hay una pieza en trámite: su valor se suma a esta factura cuando el cliente la acepte.</p>{% endif %}
+    {% if not user.es_tecnico %}<a href="{% url 'factura_pdf' orden.pk %}" target="_blank" rel="noopener" class="btn glass text-sm inline-block mt-2">Ver / descargar factura (PDF)</a>{% endif %}
+    <p class="text-xs opacity-60 mt-2">Incluye lo aceptado por el cliente. Los repuestos adicionales que el técnico use en la reparación se agregan aquí.</p>
+  </div>
+  {% endif %}
+
+  {% for p in presupuestos %}{% if p.estado != 'ACEPTADO' %}
+  <div class="rounded-2xl border border-slate-500/30 p-4 text-sm">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <b>{% if p.espera_pieza %}Proforma de diagnóstico{% else %}Presupuesto{% endif %} #{{ p.pk }} · {{ p.creado_en|date:"d/m/Y" }}</b>
+      <span class="rounded-full px-3 py-1 text-xs font-bold text-white {% if p.estado == 'ACEPTADO' %}bg-emerald-500{% elif p.estado == 'RECHAZADO' %}bg-rose-500{% else %}bg-amber-500{% endif %}">{{ p.get_estado_display }}</span>
+    </div>
+    <table class="w-full mt-2">
+      <thead class="opacity-70 text-left"><tr><th class="py-1">Detalle</th><th class="text-right">Cant.</th><th class="text-right">Precio</th><th class="text-right">Subtotal</th></tr></thead>
+      <tbody>
+        {% for i in p.items.all %}
+        <tr class="border-t border-slate-500/20"><td class="py-1">{% if i.tipo == 'SERVICIO' %}{{ i.tarifa.nombre }}{% else %}{{ i.producto.nombre }} <span class="text-xs opacity-60">(repuesto)</span>{% endif %}</td><td class="text-right">{{ i.cantidad }}</td><td class="text-right">{{ i.precio_unit|dinero }}</td><td class="text-right">{{ i.subtotal|dinero }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t border-slate-500/30"><td colspan="3" class="text-right pt-1 opacity-80">Subtotal</td><td class="text-right pt-1">{{ p.subtotal|dinero }}</td></tr>
+        {% with d=p.con_descuento %}
+        {% if d %}
+        <tr class="text-emerald-600 font-bold"><td colspan="3" class="text-right">Descuento acordado{% if orden.descuento_motivo %} ({{ orden.descuento_motivo }}){% endif %}</td><td class="text-right">- {{ d.descuento|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right opacity-80">Subtotal con descuento</td><td class="text-right">{{ d.subtotal|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right opacity-80">IVA {{ p.iva_porcentaje|numero_limpio }}%</td><td class="text-right">{{ d.iva|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right font-extrabold">Total a pagar</td><td class="text-right font-extrabold">{{ d.total|dinero }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="text-right opacity-80">IVA {{ p.iva_porcentaje|numero_limpio }}%</td><td class="text-right">{{ p.iva|dinero }}</td></tr>
+        <tr><td colspan="3" class="text-right font-extrabold">Total</td><td class="text-right font-extrabold">{{ p.total|dinero }}</td></tr>
+        {% endif %}
+        {% endwith %}
+      </tfoot>
+    </table>
+    {% if p.espera_pieza %}<p class="mt-2 rounded-xl bg-amber-500/20 p-2 text-xs">Esta proforma incluye el diagnóstico, la mano de obra y las piezas que ya hay en el taller. Falta una pieza (o más): su precio y los días de entrega se te enviarán aparte. Si aceptas, el diagnóstico y la mano de obra ya quedan cobrados y no se repiten cuando llegue el valor de la pieza.</p>{% endif %}
+    {% if p.observacion %}<p class="mt-2 opacity-80"><b>Nota del técnico:</b> {{ p.observacion }}</p>{% endif %}
+    {% if p.estado == 'PENDIENTE' %}
+      {% if user.es_cliente %}
+        <form method="post" action="{% url 'presupuesto_responder' orden.pk p.pk %}" class="flex gap-2 flex-wrap mt-3">
+          {% csrf_token %}
+          <input name="motivo" maxlength="300" class="inp w-full" placeholder="Si lo rechazas, cuéntanos por qué (opcional)" aria-label="Motivo del rechazo">
+          <button name="respuesta" value="aceptar" class="btn g3 t text-sm" data-confirmar="¿Aceptar este presupuesto por {% if p.con_descuento %}{{ p.con_descuento.total|dinero }}{% else %}{{ p.total|dinero }}{% endif %}? Se reservarán los repuestos.">Aceptar presupuesto</button>
+          <button name="respuesta" value="rechazar" class="btn glass text-sm text-rose-500" data-confirmar="{% if factura.lineas %}¿Rechazar este pedido? No se hará y tu equipo sigue con lo que ya aceptaste, que es lo único que pagas.{% elif orden.tiene_descuento %}¿Rechazar este presupuesto? Ya tiene un descuento y no habrá más rebaja: tu orden quedará rechazada y sin cobro.{% else %}¿Rechazar este presupuesto? Tu equipo quedará cancelado, pero podrás hablar con la administración para negociar.{% endif %}">Rechazar</button>
+        </form>
+      {% elif user.es_tecnico %}
+        <form method="post" action="{% url 'presupuesto_retirar' orden.pk p.pk %}" class="mt-3">
+          {% csrf_token %}
+          <button class="btn glass text-sm" data-confirmar="¿Retirar este presupuesto para corregirlo? El cliente ya no podrá responderlo.">Retirar para corregir</button>
+        </form>
+        <p class="text-xs opacity-60 mt-1">Esperando la respuesta del cliente.</p>
+      {% endif %}
+    {% elif p.estado == 'RECHAZADO' %}
+      <p class="text-xs opacity-70 mt-2">Rechazado el {{ p.respondido_en|date:"d/m/Y H:i" }}.</p>
+    {% endif %}
+  </div>
+  {% endif %}{% empty %}
+    <p class="text-sm opacity-70">{% if user.es_cliente %}Todavía no hay presupuesto para tu equipo. El técnico te lo enviará después del diagnóstico.{% else %}Todavía no se ha enviado ningún presupuesto.{% endif %}</p>
+  {% endfor %}
+
+  {% if puede_presupuestar %}
+  <form method="post" action="{% url 'presupuesto_crear' orden.pk %}" class="space-y-3 rounded-2xl bg-slate-500/10 p-4" data-presupuesto data-iva="{{ iva|unlocalize }}" novalidate>
+    {% csrf_token %}
+    <b class="text-sm">{% if presupuesto_adicional %}Presupuesto adicional (otro problema o más piezas){% else %}Armar presupuesto{% endif %}</b>
+    <label class="text-sm inline-flex items-start gap-2"><input type="checkbox" name="proforma" class="mt-1" data-proforma> <span><b>Es una proforma de diagnóstico</b> (falta alguna pieza y hay que esperarla). Puedes incluir en ella las piezas que <u>sí</u> tienes en stock y pedir abajo las que faltan. Escribe en la nota para el cliente que debe esperar la pieza.</span></label>
+    <div class="space-y-1" data-bloque-servicios>
+      <div class="text-xs opacity-70">Servicios</div>
+      {% if tarifas_disp %}
+      <div data-servicios class="space-y-2"></div>
+      <button type="button" class="text-sm underline" data-agregar-servicio>+ Agregar servicio</button>
+      <template data-plantilla-servicio>
+        <div class="flex gap-2 items-center" data-fila-servicio>
+          <select name="servicio_sel" class="inp flex-1 min-w-0" aria-label="Servicio">
+            <option value="">— Elige un servicio —</option>
+            {% for t in tarifas_disp %}<option value="{{ t.pk }}" data-precio="{{ t.precio|unlocalize }}">{{ t.nombre }} · {{ t.precio|dinero }}{% if not t.servicio %} (general){% endif %}</option>{% endfor %}
+          </select>
+          <input type="number" name="servicio_cant" min="1" max="100" step="1" value="1" class="inp !w-20 text-right" aria-label="Cantidad del servicio">
+          <button type="button" class="text-rose-500 px-2" data-quitar-servicio aria-label="Quitar servicio">×</button>
+        </div>
+      </template>
+      {% else %}<p class="text-xs opacity-60">No hay tarifas para este servicio. El administrador debe crearlas en Tarifas.</p>{% endif %}
+    </div>
+    <div class="space-y-1" data-bloque-repuestos>
+      <div class="text-xs opacity-70">Repuestos del inventario (solo los que hay en stock)</div>
+      <div data-repuestos class="space-y-2"></div>
+      <button type="button" class="text-sm underline" data-agregar-repuesto>+ Agregar otro repuesto</button>
+      <p class="text-xs opacity-60">Cada repuesto tiene su propia categoría (por ejemplo, uno de Computadoras y otro de Mantenimiento): agrega tantos como necesites. Los que no están en el inventario se piden en el recuadro de abajo.</p>
+      <template data-plantilla>
+        <div class="flex gap-2 items-center flex-wrap" data-fila>
+          <select class="inp sm:!w-44" data-categoria-fila aria-label="Categoría de este repuesto">
+            <option value="">Todas las categorías</option>
+            {% for c in categorias_inventario %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
+          </select>
+          <select name="producto" class="inp flex-1 min-w-[10rem]" aria-label="Repuesto">
+            <option value="">— Elige un repuesto —</option>
+            {% for r in repuestos_disp %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-precio="{{ r.precio_venta|unlocalize }}" data-stock="{{ r.stock }}">{{ r.nombre }} · {{ r.precio_venta|dinero }} ({{ r.stock }} disp.)</option>{% endfor %}
+          </select>
+          <input type="number" name="cantidad_producto" min="1" max="100" step="1" value="1" class="inp !w-20 text-right" aria-label="Cantidad">
+          <button type="button" class="text-rose-500 px-2" data-quitar aria-label="Quitar repuesto">×</button>
+        </div>
+      </template>
+    </div>
+    <div class="space-y-1">
+      <div class="text-xs opacity-70">Piezas que faltan (se piden al administrador al enviar; puedes agregar varias)</div>
+      <div data-faltan class="space-y-1"></div>
+      <button type="button" class="text-sm underline" data-agregar-falta>+ Pedir una pieza que falta</button>
+      <template data-plantilla-falta>
+        <div class="flex gap-2 items-center" data-fila-falta>
+          <input name="falta_nombre" maxlength="120" class="inp flex-1" placeholder="Pieza que falta (ej. pantalla 15.6)" aria-label="Pieza que falta">
+          <input type="number" name="falta_cantidad" min="1" max="100" value="1" class="inp !w-20 text-right" aria-label="Cantidad de la pieza que falta">
+          <button type="button" class="text-rose-500 px-2" data-quitar-falta aria-label="Quitar pieza">×</button>
+        </div>
+      </template>
+    </div>
+    <textarea name="observacion" rows="2" maxlength="500" class="inp w-full" placeholder="Nota para el cliente (opcional): garantía, tiempo, aclaraciones"></textarea>
+    <div class="text-sm rounded-xl bg-slate-500/10 p-3">
+      Subtotal <b data-subtotal>$0.00</b> · IVA {{ iva|numero_limpio }}% <b data-iva-monto>$0.00</b> · Total <b class="text-lg" data-total>$0.00</b>
+    </div>
+    <button type="submit" class="btn g3 t text-sm">Enviar presupuesto al cliente</button>
+  </form>
+  {% elif user.es_tecnico and orden.estado != 'ENTREGADO' and not orden.congelada and presupuestos %}
+    <p class="text-xs opacity-60">Mientras el cliente no responda el presupuesto pendiente no puedes enviar otro. Después podrás agregar uno adicional si encuentras otro problema.</p>
+  {% endif %}
+</details>
+
+{% if piezas or user.es_tecnico %}
+<details class="glass rounded-3xl p-6 space-y-3" id="piezas" {% if piezas %}open{% endif %}>
+  <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'refresh' 'w-5 h-5' %}Piezas</summary>
+  {% for z in piezas %}
+  <div class="rounded-2xl border border-slate-500/30 p-4 text-sm space-y-2">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <div><b>{{ z.cantidad }} × {{ z.nombre_pieza }}</b>{% if z.categoria %} <span class="rounded-full bg-slate-500/20 px-2 py-0.5 text-xs">{{ z.categoria.nombre }}</span>{% endif %}{% if z.observacion %} <span class="opacity-70">· {{ z.observacion }}</span>{% endif %}<div class="text-xs opacity-60">Pedida por {{ z.tecnico.nombre }} · {{ z.creada_en|date:"d/m/Y H:i" }}</div></div>
+      <span class="rounded-full px-3 py-1 text-xs font-bold text-white {% if z.estado == 'DISPONIBLE' %}bg-emerald-500{% elif z.estado == 'RECHAZADA' or z.estado == 'DESCARTADA' %}bg-slate-500{% elif z.estado == 'PEDIDA' or z.estado == 'ACEPTADA' %}bg-sky-500{% else %}bg-amber-500{% endif %}">{{ z.get_estado_display }}</span>
+    </div>
+    {% if z.precio %}
+    <div class="rounded-xl bg-slate-500/10 p-2">
+      {{ z.cantidad }} × {{ z.precio|dinero }} = {{ z.subtotal|dinero }} + IVA {{ z.iva_porcentaje|numero_limpio }}% {{ z.iva|dinero }} = <b>{{ z.total|dinero }}</b>
+      {% if z.dias_entrega is not None %}<div class="text-xs opacity-80">Tarda {{ z.dias_entrega }} día{{ z.dias_entrega|pluralize }} en llegar{% if z.llegada_estimada %} · llega aprox. el {{ z.llegada_estimada|date:"d/m/Y" }}{% endif %}.</div>{% endif %}
+      {% if user.es_admin and z.proveedor %}<div class="text-xs opacity-70">Proveedor: {{ z.proveedor.nombre }}{% if z.costo %} · costo {{ z.costo|dinero }} por unidad{% endif %}</div>{% endif %}
+      {% if z.nota_admin %}<div class="text-xs opacity-80">Nota: {{ z.nota_admin }}</div>{% endif %}
+    </div>
+    {% elif z.estado == 'DESCARTADA' and z.nota_admin %}<p class="text-xs opacity-80">Motivo: {{ z.nota_admin }}</p>{% endif %}
+
+    {% if z.estado == 'COTIZADA' and user.es_cliente and not orden.congelada %}
+      <p>Total de la orden si aceptas: <b>{{ total_orden|dinero }} + {{ z.total|dinero }} = {{ total_con_pieza|dinero }}</b></p>
+      {% if fecha_nueva %}<p class="rounded-xl bg-amber-500/20 p-2 text-xs">Por la espera de la pieza, la entrega estimada {% if orden.fecha_estimada %}pasará del {{ orden.fecha_estimada|date:"d/m/Y" }} al{% else %}será el{% endif %} <b>{{ fecha_nueva|date:"d/m/Y" }}</b>.</p>{% endif %}
+      <form method="post" action="{% url 'pieza_responder' orden.pk z.pk %}" class="flex gap-2 flex-wrap">
+        <input name="motivo" maxlength="300" class="inp w-full" placeholder="Si la rechazas, cuéntanos por qué (opcional)" aria-label="Motivo del rechazo">
+        {% csrf_token %}
+        <button name="respuesta" value="aceptar" class="btn g3 t text-sm" data-confirmar="¿Aceptar la pieza por {{ z.total|dinero }}?">Aceptar pieza</button>
+        <button name="respuesta" value="rechazar" class="btn glass text-sm text-rose-500" data-confirmar="¿Rechazar la pieza? Tu equipo quedará cancelado, pero podrás hablar con la administración para negociar.">Rechazar</button>
+      </form>
+    {% elif z.estado == 'PENDIENTE' and user.es_cliente %}
+      <p class="text-xs opacity-70">El administrador está consultando el precio y el tiempo de entrega. Te avisaremos.</p>
+    {% elif z.estado == 'PENDIENTE' and user.es_admin %}
+      {% if z.agotada %}
+      <form method="post" action="{% url 'pieza_reponer' orden.pk z.pk %}" class="space-y-2 rounded-2xl bg-amber-500/10 p-3">
+        {% csrf_token %}
+        <b class="text-sm">Esta pieza se agotó en el inventario</b>
+        <p class="text-xs opacity-80">No hay que cotizarla: ya existe y tiene precio. Pídela al proveedor, repón el stock y dile aquí en cuántos días llega: se avisa al técnico y al cliente, y la fecha de entrega se corre si hace falta.</p>
+        <div class="flex gap-2 flex-wrap items-center">
+          <input type="number" name="dias_reposicion" min="0" max="365" class="inp !w-40" placeholder="Días en llegar" aria-label="Días en llegar el stock" required>
+          <button class="btn g3 t text-sm" data-confirmar="¿Avisar al técnico y al cliente que el stock llegará en esos días?">Avisar y reponer</button>
+          {% if z.producto %}<a href="{% url 'producto_detalle' z.producto.pk %}" class="btn glass text-sm">Ir a reponer el stock</a>{% endif %}
+        </div>
+        <p class="text-xs opacity-60">Cuando registres la reposición en el inventario, el técnico recibe solo el aviso de que ya llegó.</p>
+      </form>
+      {% else %}
+      <form method="post" action="{% url 'pieza_cotizar' orden.pk z.pk %}" class="grid sm:grid-cols-2 gap-2" data-cotizar data-margen="{{ margen|unlocalize }}" novalidate>
+        {% csrf_token %}
+        <b class="sm:col-span-2">Cotizar esta pieza</b>
+        <select name="categoria" class="inp" aria-label="Categoría de la pieza" data-categoria-pieza>
+          <option value="">Categoría de la pieza (para ver sus proveedores)</option>
+          {% for c in categorias_disp %}<option value="{{ c.pk }}"{% if z.categoria_id == c.pk %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+        </select>
+        <select name="proveedor" class="inp" aria-label="Proveedor" data-proveedor>
+          <option value="">— Elige el proveedor —</option>
+          {% if z.categoria %}<optgroup label="Proveedores de {{ z.categoria.nombre }}">
+            {% for v in z.proveedores_de_su_categoria %}<option value="{{ v.pk }}" data-cats="{{ v.cats }}"{% if v.dias_entrega is not None %} data-dias="{{ v.dias_entrega }}"{% endif %}>{{ v.nombre }}{% if v.dias_entrega is not None %} · {{ v.dias_entrega }} día{{ v.dias_entrega|pluralize }}{% endif %}</option>{% endfor %}
+          </optgroup><optgroup label="Otros proveedores">{% endif %}
+          {% for v in z.otros_proveedores %}<option value="{{ v.pk }}" data-cats="{{ v.cats }}"{% if v.dias_entrega is not None %} data-dias="{{ v.dias_entrega }}"{% endif %}>{{ v.nombre }}{% if v.dias_entrega is not None %} · {{ v.dias_entrega }} día{{ v.dias_entrega|pluralize }}{% endif %}</option>{% endfor %}
+          {% if z.categoria %}</optgroup>{% endif %}
+        </select>
+        <input name="dias_entrega" type="number" min="0" max="365" class="inp" placeholder="Días de entrega" aria-label="Días de entrega" data-dias>
+        <input name="costo" inputmode="decimal" class="inp" placeholder="Lo que te cobra el proveedor, por unidad" aria-label="Costo al proveedor" data-costo>
+        <input name="precio" inputmode="decimal" class="inp" placeholder="Precio al cliente, por unidad (sin IVA)" aria-label="Precio al cliente" data-precio>
+        <input name="nota_admin" maxlength="300" class="inp sm:col-span-2" placeholder="Nota para el cliente (opcional)">
+        <p class="text-xs opacity-60 sm:col-span-2" data-ayuda>Elige el proveedor y escribe lo que te cobra: ese proveedor y ese costo pasan solos al formulario del producto. Si dejas el precio al cliente vacío, se calcula con el margen general ({{ margen|numero_limpio }}%). El cliente verá el total con IVA.</p>
+        <div class="sm:col-span-2 flex gap-2 flex-wrap">
+          <button class="btn g3 t text-sm">Enviar cotización al cliente</button>
+        </div>
+      </form>
+      <form method="post" action="{% url 'pieza_descartar' orden.pk z.pk %}" class="space-y-2 rounded-2xl bg-slate-500/10 p-3">
+        {% csrf_token %}
+        <b class="text-sm">Si no se consigue esta pieza</b>
+        <input name="nota_admin" maxlength="300" class="inp w-full" placeholder="Motivo (opcional)">
+        <label class="text-sm inline-flex items-center gap-2"><input type="checkbox" name="avisar_cliente"> Avisar también al cliente (el técnico siempre recibe el aviso)</label>
+        <label class="text-sm flex items-start gap-2"><input type="checkbox" name="cerrar_orden" class="mt-1"> <span>Rechazar la orden por esto. Elige qué se le cobra al cliente (sin IVA):</span></label>
+        <div class="grid gap-1 text-sm pl-6">
+          <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="nada" checked> No cobrar nada</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="diagnostico"> Solo el diagnóstico ({{ diagnostico|dinero }})</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="mano"> La mano de obra ({{ mano_de_obra|dinero }}), si ya estaba en reparación</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="otro"> Otro valor: <input name="cargo" inputmode="decimal" placeholder="Ej. 10.00" class="inp !w-28" aria-label="Otro valor a cobrar"></label>
+        </div>
+        <button class="btn glass text-sm text-rose-500" data-confirmar="¿No pedir esta pieza? Se avisará al técnico. Si marcaste rechazar la orden, quedará rechazada con el cobro elegido.">No pedir esta pieza</button>
+      </form>
+      {% endif %}
+    {% elif z.estado == 'ACEPTADA' and user.es_admin %}
+      <form method="post" action="{% url 'pieza_pedida' orden.pk z.pk %}">{% csrf_token %}<button class="btn g4 t text-sm" data-confirmar="¿Hacer el pedido a {{ z.proveedor.nombre|default:'el proveedor' }}? Se avisará al cliente y al técnico.">Pedir al proveedor{% if z.proveedor %} ({{ z.proveedor.nombre }}){% endif %}</button></form>
+      <p class="text-xs opacity-60">Cuando el pedido salga, la pieza queda «Pedida» y recién ahí podrás registrarla en el inventario al llegar.</p>
+    {% elif z.estado == 'ACEPTADA' and user.es_cliente %}
+      <p class="text-xs opacity-70">Aceptaste la pieza. El administrador la pedirá al proveedor.</p>
+    {% elif z.estado == 'PEDIDA' and not user.es_admin %}
+      <p class="text-xs opacity-70">La pieza ya fue pedida al proveedor{% if z.llegada_estimada %}; llega aprox. el {{ z.llegada_estimada|date:"d/m/Y" }}{% endif %}.</p>
+    {% elif z.estado == 'COTIZADA' %}
+      <p class="text-xs opacity-70">Esperando la respuesta del cliente.</p>
+    {% endif %}
+    {% if user.es_admin and z.estado == 'PEDIDA' %}
+      <a href="{% url 'producto_nuevo' %}?pieza={{ z.pk }}" class="btn g3 t text-sm inline-block">Llegó la pieza: registrarla en el inventario</a>
+      <p class="text-xs opacity-60">Se abre «Nuevo producto» con los datos ya llenos. Al guardar, la pieza se da por llegada: se avisa al técnico y al cliente, y la orden pasa a reparación.</p>
+    {% elif user.es_admin and z.producto %}
+      <p class="text-xs opacity-80">En el inventario: <a class="underline font-bold" href="{% url 'producto_detalle' z.producto.pk %}">{{ z.producto.nombre }}</a></p>
+    {% endif %}
+  </div>
+  {% empty %}
+    <p class="text-sm opacity-70">No se ha pedido ninguna pieza.</p>
+  {% endfor %}
+  {% if user.es_tecnico and orden.estado != 'ENTREGADO' and not orden.congelada %}
+  <form method="post" action="{% url 'pieza_pedir' orden.pk %}" class="space-y-2 rounded-2xl bg-slate-500/10 p-4" novalidate>
+    {% csrf_token %}
+    <b class="text-sm">Pedir una pieza</b>
+    <div class="grid gap-1 text-sm" data-tipo-pieza>
+      <label class="flex items-start gap-2"><input type="radio" name="tipo_pieza" value="nueva" checked class="mt-1"> <span><b>No existe en el inventario</b>: hay que cotizarla con un proveedor y el cliente debe aceptarla.</span></label>
+      <label class="flex items-start gap-2"><input type="radio" name="tipo_pieza" value="agotada" class="mt-1"> <span><b>Está en el inventario pero se agotó</b>: solo hay que reponer el stock (el cliente se entera de los días extra).</span></label>
+    </div>
+    <div class="hidden space-y-1" data-bloque-agotada>
+      <select name="producto" class="inp w-full" aria-label="Pieza agotada del inventario">
+        <option value="">— Elige la pieza agotada —</option>
+        {% for r in productos_agotados %}<option value="{{ r.pk }}">{{ r.nombre }}{% if r.categoria %} · {{ r.categoria.nombre }}{% endif %} (stock 0)</option>{% endfor %}
+      </select>
+    </div>
+    <div data-bloque-nueva class="space-y-2">
+    <input name="nombre_pieza" maxlength="120" class="inp w-full" placeholder="Nombre de la pieza (por ejemplo, pantalla 15.6 LED)">
+    <select name="categoria" class="inp w-full" aria-label="Categoría de la pieza">
+      <option value="">Categoría (si la sabes)</option>
+      {% for c in categorias_disp %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
+    </select>
+    </div>
+    <div class="flex gap-2">
+      <input type="number" name="cantidad_pieza" min="1" max="100" value="1" class="inp !w-24" aria-label="Cantidad">
+      <input name="observacion_pieza" maxlength="300" class="inp flex-1" placeholder="Detalle (opcional)">
+    </div>
+    <button class="btn g4 t text-sm">Solicitar pieza al administrador</button>
+    <p class="text-xs opacity-60">Puedes pedirla en cuanto la detectes, sin esperar a que el cliente acepte nada. El administrador consulta al proveedor, pone el precio y los días, y se lo envía al cliente. La orden queda «en espera de repuesto» hasta que la pieza llegue.</p>
+  </form>
+  {% endif %}
+</details>
+{% endif %}
+{% endif %}
+
+{% if usos or piezas_por_usar or productos_uso or repuestos_presupuesto %}
+<details class="glass rounded-3xl p-6 space-y-3" id="repuestos-usados" {% if usos or piezas_por_usar %}open{% endif %}>
+  <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'wrench' 'w-5 h-5' %}Repuestos usados</summary>
+  {% for u in usos %}
+    <div class="flex items-center justify-between gap-2 flex-wrap text-sm">
+      <span><b>{{ u.cantidad }} × {{ u.producto.nombre }}</b> <span class="opacity-60">· {{ u.creado_en|date:"d/m/Y H:i" }} · {{ u.tecnico.nombre }}</span></span>
+      {% if user.es_tecnico and orden.estado != 'ENTREGADO' and not orden.congelada %}
+      <form method="post" action="{% url 'repuesto_quitar' orden.pk u.pk %}">{% csrf_token %}<button class="text-xs underline text-rose-500" data-confirmar="¿Quitar este repuesto? Volverá al inventario.">Quitar (se equivocó)</button></form>
+      {% endif %}
+    </div>
+  {% empty %}{% if not repuestos_presupuesto %}<p class="text-sm opacity-70">Todavía no se registró ningún repuesto usado.</p>{% endif %}{% endfor %}
+  {% for i in repuestos_presupuesto %}
+    <div class="flex items-center justify-between gap-2 flex-wrap text-sm rounded-2xl bg-slate-500/10 p-3">
+      <span><b>{{ i.cantidad }} × {{ i.producto.nombre }}</b> <span class="opacity-60">· del presupuesto aceptado (ya salió del inventario)</span></span>
+      {% if i.en_uso_en %}
+        <span class="rounded-full px-3 py-1 text-xs font-bold text-white bg-emerald-500">En uso desde {{ i.en_uso_en|date:"d/m H:i" }}</span>
+      {% elif user.es_tecnico and orden.estado == 'REPARACION' %}
+        <form method="post" action="{% url 'repuesto_marcar' orden.pk i.pk %}">{% csrf_token %}<button class="btn g3 t text-sm" data-confirmar="¿Marcar {{ i.cantidad }} × {{ i.producto.nombre }} como en uso?">Marcar como en uso</button></form>
+      {% else %}
+        <span class="rounded-full px-3 py-1 text-xs font-bold text-white bg-amber-500">Por usar</span>
+      {% endif %}
+    </div>
+  {% endfor %}
+  {% if piezas_por_usar %}
+    {% for z in piezas_por_usar %}
+    <form method="post" action="{% url 'repuesto_usar' orden.pk %}" class="rounded-2xl bg-emerald-500/20 p-3 text-sm flex items-center justify-between gap-2 flex-wrap">
+      {% csrf_token %}<input type="hidden" name="pieza" value="{{ z.pk }}">
+      <span>Llegó la pieza que pediste: <b>{{ z.cantidad }} × {{ z.nombre_pieza }}</b>. Regístrala cuando la instales.</span>
+      <button class="btn g3 t text-sm" data-confirmar="¿Registrar {{ z.cantidad }} × {{ z.nombre_pieza }} como usada? Saldrá del inventario.">Usar esta pieza</button>
+    </form>
+    {% endfor %}
+  {% endif %}
+  {% if productos_uso %}
+  <form method="post" action="{% url 'repuesto_usar' orden.pk %}" class="space-y-2 rounded-2xl bg-slate-500/10 p-4" data-uso novalidate>
+    {% csrf_token %}
+    <b class="text-sm">Buscar otro repuesto en el inventario</b>
+    <select class="inp w-full" data-categoria-filtro aria-label="Filtrar por categoría">
+      <option value="">Todas las categorías</option>
+      {% for c in categorias_inventario %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
+    </select>
+    <input type="search" class="inp w-full" placeholder="Escribe para buscar (nombre o código)" aria-label="Buscar repuesto" data-filtro>
+    <div class="flex gap-2">
+      <select name="producto" class="inp flex-1" aria-label="Repuesto" data-lista>
+        <option value="">— Elige un repuesto —</option>
+        {% for r in productos_uso %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-texto="{{ r.nombre|lower }} {{ r.codigo|lower }}">{{ r.nombre }} · {{ r.codigo }} ({{ r.stock }} disp.)</option>{% endfor %}
+      </select>
+      <input type="number" name="cantidad" min="1" max="100" value="1" class="inp !w-20 text-right" aria-label="Cantidad">
+    </div>
+    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="reemplazo" value="1" class="mt-1"><span>Es el <b>reemplazo de uno que se dañó</b> (no se cobra al cliente).</span></label>
+    <button class="btn g4 t text-sm">Registrar como usado</button>
+    <p class="text-xs opacity-60">Al registrarlo sale del inventario. <b>Se suma a la factura del cliente</b> (precio de venta + IVA) y él recibe un aviso; el administrador también lo ve. Si marcas «reemplazo», no se cobra. Los repuestos del presupuesto aceptado ya salieron al aceptarse: no los registres otra vez.</p>
+  </form>
+  {% endif %}
+</details>
+{% endif %}
+
+{% if productos_danio %}
+<details class="glass rounded-3xl p-6" id="repuesto-danado">
+  <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'alert' 'w-5 h-5' %}Reportar un repuesto dañado</summary>
+  <form method="post" action="{% url 'repuesto_danado' orden.pk %}" class="space-y-2 mt-3" novalidate>
+    {% csrf_token %}
+    <p class="text-xs opacity-70">Aquí solo aparecen los repuestos que estás usando en esta orden. Si uno se rompió o salió defectuoso, repórtalo: queda en el informe de dañados con tu motivo, no se cobra al cliente y el administrador lo ve como pérdida. La unidad ya había salido del inventario, así que puedes reportarla aunque el stock esté en 0. Si necesitas otra, regístrala arriba como «reemplazo».</p>
+    <div class="flex gap-2 flex-wrap">
+      <select name="producto" class="inp flex-1 min-w-[12rem]" aria-label="Repuesto dañado">
+        <option value="">— Elige el repuesto —</option>
+        {% for r in productos_danio %}<option value="{{ r.pk }}">{{ r.nombre }} · {{ r.codigo }} ({{ r.en_uso }} en uso)</option>{% endfor %}
+      </select>
+      <input type="number" name="cantidad" min="1" max="100" value="1" class="inp !w-20 text-right" aria-label="Cantidad">
+    </div>
+    <input name="motivo" maxlength="120" class="inp w-full" placeholder="¿Qué pasó? (ej. se rompió al instalarla)" aria-label="Motivo">
+    <button class="btn glass text-sm text-rose-500" data-confirmar="¿Reportar este repuesto como dañado? Quedará como pérdida del taller.">Reportar daño</button>
+  </form>
+</details>
+{% endif %}

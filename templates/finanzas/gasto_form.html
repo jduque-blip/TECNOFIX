@@ -1,0 +1,11 @@
+{% extends 'panel/admin_base.html' %}
+{% block panel %}
+  <form method="post" class="glass rounded-2xl p-5 space-y-3 max-w-2xl" novalidate>
+    {% csrf_token %}
+    <h3 class="font-extrabold">Editar «{{ gasto.concepto }}»</h3>
+    {% for c in form %}
+      <div><label for="{{ c.id_for_label }}" class="text-sm opacity-70">{{ c.label }}</label>{{ c }}{% if c.errors %}<p class="text-xs text-rose-500 mt-1">{{ c.errors.0 }}</p>{% endif %}</div>
+    {% endfor %}
+    <div class="flex gap-2"><button type="submit" class="btn g3 t">Guardar</button><a href="{% url 'gastos' %}" class="btn glass">Cancelar</a></div>
+  </form>
+{% endblock %}

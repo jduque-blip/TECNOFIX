@@ -1,0 +1,76 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  {% include 'inventario/_subtabs.html' with sub='prv' %}
+
+  {# Categorías #}
+  <section class="glass rounded-2xl p-4 mb-4">
+    <h3 class="font-extrabold mb-1 inline-flex items-center gap-2">{% ico 'tag' 'w-5 h-5' %}Categorías</h3>
+    <p class="text-xs opacity-70 mb-3">Agrupan a los proveedores y a los productos. Puedes crear las que necesites.</p>
+    <div class="flex gap-2 flex-wrap mb-3">
+      <a href="{% url 'proveedores' %}" class="btn text-sm {% if not categoria %}g1 t{% else %}glass{% endif %}">Todos ({{ todos }})</a>
+      {% for c in categorias %}
+        <span class="inline-flex items-center rounded-2xl overflow-hidden {% if categoria.pk == c.pk %}shadow-lg{% endif %}">
+          <a href="?categoria={{ c.pk }}" class="btn text-sm rounded-r-none {% if categoria.pk == c.pk %}g1 t{% else %}glass{% endif %}">{{ c.nombre }} ({{ c.proveedores.all|length }})</a>
+          <form method="post" action="{% url 'categoria_eliminar' c.pk %}">
+            {% csrf_token %}
+            <button class="btn glass text-sm rounded-l-none px-2" title="Eliminar categoría" aria-label="Eliminar categoría {{ c.nombre }}" data-confirmar="¿Eliminar la categoría «{{ c.nombre }}»? Los productos y proveedores quedan sin ella.">×</button>
+          </form>
+        </span>
+      {% empty %}
+        <span class="text-sm opacity-70">Aún no hay categorías.</span>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'categoria_crear' %}" class="flex gap-2 items-start flex-wrap" novalidate>
+      {% csrf_token %}
+      <input name="nombre" class="inp w-72" placeholder="Nueva categoría (ej. Monitores)" maxlength="60" autocomplete="off" aria-label="Nombre de la categoría">
+      <button type="submit" class="btn g4 t text-sm">+ Añadir categoría</button>
+    </form>
+  </section>
+
+  {# Nuevo proveedor #}
+  <form method="post" class="glass rounded-2xl p-5 space-y-3" novalidate>
+    {% csrf_token %}
+    <h3 class="font-extrabold inline-flex items-center gap-2">{% ico 'users' 'w-5 h-5' %}Nuevo proveedor</h3>
+    <div class="grid sm:grid-cols-3 gap-3 items-start">
+      {% include 'parciales/_campo.html' with campo=form.nombre icono='users' ph='Nombre del proveedor' %}
+      {% include 'parciales/_campo.html' with campo=form.telefono icono='phone' ph='Teléfono (opcional)' tipo='tel' %}
+      {% include 'parciales/_campo.html' with campo=form.dias_entrega icono='calendar' ph='Días de entrega (opcional)' tipo='number' step='1' minimo='0' %}
+    </div>
+    {% include 'inventario/_categorias_checks.html' with campo=form.categorias %}
+    <button type="submit" class="btn g3 t">+ Añadir proveedor</button>
+  </form>
+
+  {# Lista #}
+  <h3 class="text-lg font-extrabold mt-6 mb-1">{% if categoria %}Proveedores de {{ categoria.nombre }}{% else %}Todos los proveedores{% endif %}</h3>
+  <p class="text-xs opacity-70 mb-3">El teléfono y los días de entrega se editan aquí mismo: cambia el valor y se guarda solo.</p>
+  {% for v in proveedores %}
+    <div class="glass rounded-2xl p-4 mb-2">
+      <div class="flex justify-between items-start gap-3 flex-wrap">
+        <div>
+          <b class="text-lg">{{ v.nombre }}</b>
+          <div class="flex gap-1 flex-wrap mt-1">
+            {% for c in v.categorias.all %}<span class="bg-slate-500/20 rounded-full px-2 py-0.5 text-xs">{{ c.nombre }}</span>{% empty %}<span class="text-xs opacity-60">Sin categoría</span>{% endfor %}
+          </div>
+          <div class="text-xs opacity-60 mt-1">{{ v.productoproveedor_set.all|length }} producto{{ v.productoproveedor_set.all|length|pluralize }}</div>
+        </div>
+        <div class="flex gap-2 items-center flex-wrap">
+          <form method="post" action="{% url 'proveedor_contacto' v.pk %}" class="flex items-center gap-2 flex-wrap">
+            {% csrf_token %}
+            <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+            <label class="inp flex items-center gap-2 w-44">{% ico 'phone' 'w-4 h-4 shrink-0 opacity-70' %}<input name="telefono" type="tel" value="{{ v.telefono }}" placeholder="Teléfono" maxlength="20" data-autoenviar aria-label="Teléfono de {{ v.nombre }}"></label>
+            <label class="inp flex items-center gap-2 w-32">{% ico 'calendar' 'w-4 h-4 shrink-0 opacity-70' %}<input name="dias_entrega" type="number" min="0" max="365" value="{{ v.dias_entrega|default_if_none:'' }}" placeholder="Días" data-autoenviar aria-label="Días de entrega de {{ v.nombre }}"></label>
+          </form>
+          <a href="{% url 'proveedor_editar' v.pk %}" class="btn glass text-sm">Editar</a>
+          <form method="post" action="{% url 'proveedor_eliminar' v.pk %}">
+            {% csrf_token %}
+            <button class="btn bg-rose-500 text-white text-sm" data-confirmar="¿Eliminar al proveedor «{{ v.nombre }}»?">Eliminar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="glass rounded-2xl p-6 text-center opacity-80">{% if categoria %}Ningún proveedor tiene la categoría «{{ categoria.nombre }}» todavía. Asígnala con el botón Editar.{% else %}Aún no hay proveedores. Añade el primero arriba.{% endif %}</div>
+  {% endfor %}
+{% endblock %}

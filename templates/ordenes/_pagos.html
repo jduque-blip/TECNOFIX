@@ -1,0 +1,98 @@
+{% load iconos %}
+{% if not user.es_tecnico and orden.estado == 'LISTO' or not user.es_tecnico and orden.estado == 'ENTREGADO' or not user.es_tecnico and pagos %}
+<div class="glass rounded-3xl p-6 space-y-4" id="pago">
+  <h3 class="font-extrabold inline-flex items-center gap-2">{% ico 'clipboard' 'w-5 h-5' %}Pago y entrega</h3>
+
+  {% if orden.estado == 'ENTREGADO' %}
+    <p class="text-sm">Equipo entregado{% if orden.entregada_en %} el {{ orden.entregada_en|date:"d/m/Y H:i" }}{% endif %}.</p>
+  {% elif pago_pagado %}
+    <p class="text-sm font-bold text-emerald-600">Pago de ${{ pago_pagado.monto }} confirmado ({{ pago_pagado.get_metodo_display|lower }}). El equipo está listo para retirar.</p>
+  {% elif pago_total <= 0 %}
+    <div class="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm space-y-1">
+      <p class="font-extrabold text-base">Total a pagar: $0.00</p>
+      {% if user.es_cliente %}
+        <p>No tienes que pagar nada. Como no se aceptó ningún presupuesto, el taller no te cobra diagnóstico ni reparación: solo retiras tu equipo tal como lo dejaste.</p>
+      {% else %}
+        <p>No hay nada que cobrar: el cliente no aceptó ningún presupuesto (o todo quedó con descuento). Autoriza la entrega sin cobro y entrega el equipo tal como está.</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="text-sm">Total a pagar: <b class="text-lg">${{ pago_total }}</b></p>
+  {% endif %}
+
+  {# ---- Cliente ---- #}
+  {% if user.es_cliente %}
+    {% if pago_pendiente %}
+      {% if pago_pendiente.metodo == 'EFECTIVO' %}
+        <p class="text-sm bg-amber-500/15 border border-amber-500/50 rounded-xl p-3">Elegiste pagar en efectivo. Acércate a las oficinas del taller con ${{ pago_pendiente.monto }}; ahí te entregamos tu equipo.</p>
+      {% else %}
+        <p class="text-sm bg-amber-500/15 border border-amber-500/50 rounded-xl p-3">Enviaste tu comprobante. Estamos revisándolo.</p>
+      {% endif %}
+    {% elif pago_puede_pagar %}
+      <p class="font-bold text-sm">¿Cómo deseas pagar?</p>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="border border-white/10 rounded-2xl p-4 space-y-2">
+          <p class="font-bold">En efectivo</p>
+          <p class="text-sm opacity-80">Te acercas a las oficinas del taller, pagas y retiras tu equipo.</p>
+          <form method="post" action="{% url 'pago_efectivo_cliente' orden.pk %}">{% csrf_token %}<button class="btn glass text-sm">Pagaré en efectivo</button></form>
+        </div>
+        <div class="border border-white/10 rounded-2xl p-4 space-y-2">
+          <p class="font-bold">Por transferencia</p>
+          <p class="text-sm opacity-80">{% if datos_transferencia %}{{ datos_transferencia }}{% else %}Pide los datos de la cuenta al taller{% endif %}. Luego sube el comprobante.</p>
+          <form method="post" action="{% url 'pago_enviar' orden.pk %}" enctype="multipart/form-data" class="space-y-2">
+            {% csrf_token %}
+            <label for="comp_comprobante" class="text-sm font-bold">Comprobante (foto o PDF, máx. 3 MB)</label>
+            {{ form_comprobante.comprobante }}
+            <label for="comp_referencia" class="text-sm font-bold block">Número del comprobante</label>
+            {{ form_comprobante.referencia }}
+            <button type="submit" class="btn g3 t text-sm">Enviar comprobante</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {# ---- Administrador ---- #}
+  {% if user.es_admin %}
+    {% if pago_pendiente %}
+      <div class="border border-amber-500/50 rounded-xl p-3 space-y-2">
+        {% if pago_pendiente.metodo == 'EFECTIVO' %}
+          <p class="text-sm font-bold">El cliente pagará ${{ pago_pendiente.monto }} en efectivo en el taller. Confirma cuando reciba el dinero.</p>
+        {% else %}
+          <p class="text-sm font-bold">Transferencia por validar: ${{ pago_pendiente.monto }} · comprobante {{ pago_pendiente.referencia }}</p>
+          <a class="underline text-sm" target="_blank" rel="noopener" href="{% url 'pago_comprobante' orden.pk pago_pendiente.pk %}">Ver comprobante</a>
+        {% endif %}
+        <div class="flex gap-2 flex-wrap items-center">
+          <form method="post" action="{% url 'pago_confirmar' orden.pk pago_pendiente.pk %}">{% csrf_token %}<button class="btn g3 t text-sm">Confirmar pago</button></form>
+          <form method="post" action="{% url 'pago_rechazar' orden.pk pago_pendiente.pk %}" class="flex gap-2 items-center flex-wrap">{% csrf_token %}
+            <input name="motivo" maxlength="300" class="inp" placeholder="Motivo del rechazo" aria-label="Motivo del rechazo">
+            <button class="btn glass text-sm text-rose-500">Rechazar</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+    {% if orden.estado == 'LISTO' and not pago_pagado and not pago_pendiente %}
+      {% if pago_total > 0 %}
+        <form method="post" action="{% url 'pago_efectivo' orden.pk %}">{% csrf_token %}
+          <button class="btn g3 t text-sm" data-confirmar="¿Recibiste ${{ pago_total }} en efectivo?">Registrar pago en efectivo (${{ pago_total }})</button>
+        </form>
+      {% elif not orden.entrega_autorizada %}
+        <form method="post" action="{% url 'entrega_sin_cobro' orden.pk %}">{% csrf_token %}<button class="btn g3 t text-sm">Autorizar entrega sin cobro</button></form>
+      {% endif %}
+    {% endif %}
+    {% if orden.estado == 'LISTO' and orden.entrega_autorizada %}
+      <form method="post" action="{% url 'entregar' orden.pk %}">{% csrf_token %}
+        <button class="btn g3 t text-sm" data-confirmar="¿Entregar el equipo al cliente?">Entregar equipo</button>
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% if pagos %}
+    <ul class="text-sm space-y-1 border-t border-white/10 pt-3">
+      {% for p in pagos %}
+        <li>{{ p.creado_en|date:"d/m/Y H:i" }} · {{ p.get_metodo_display }} · ${{ p.monto }} · <b>{{ p.get_estado_display }}</b>{% if p.estado == 'RECHAZADO' %} — {{ p.motivo_rechazo }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+{% endif %}

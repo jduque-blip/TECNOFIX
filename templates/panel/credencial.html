@@ -1,0 +1,24 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  <div class="glass rounded-3xl p-8 space-y-4 max-w-md">
+    <h3 class="text-xl font-extrabold inline-flex items-center gap-2">{% ico 'check' 'w-6 h-6' %}Acceso listo</h3>
+    <p class="text-sm opacity-80"><b>{{ persona.nombre }}</b> ({{ persona.email }}) ingresará con esta clave temporal y el sistema le pedirá crear su contraseña nueva.</p>
+
+    <div class="glass rounded-2xl p-4 flex items-center justify-between gap-3">
+      <span id="clave-temporal" class="font-mono text-3xl font-extrabold tracking-widest select-all">{{ clave }}</span>
+      <button type="button" class="btn glass text-sm inline-flex items-center gap-1" data-copiar="#clave-temporal">{% ico 'copy' 'w-4 h-4' %}Copiar</button>
+    </div>
+    <p class="text-xs opacity-70">Se muestra una sola vez. Si se pierde, genera otra desde Contraseña.</p>
+
+    {% if whatsapp %}
+      <a href="{{ whatsapp }}" target="_blank" rel="noopener" class="btn g3 t w-full inline-flex items-center justify-center gap-2">{% ico 'chat' 'w-5 h-5' %}Enviar por WhatsApp a {{ persona.telefono }}</a>
+      <p class="text-xs opacity-70">Se abre WhatsApp con el mensaje escrito; solo presiona enviar.</p>
+    {% else %}
+      <p class="text-sm text-amber-500">No tiene celular registrado, por eso no se puede enviar por WhatsApp. Cópiala y entrégala en persona.</p>
+    {% endif %}
+
+    <a href="{% if persona.es_tecnico %}{% url 'personal' %}{% else %}{% url 'clientes' %}{% endif %}" class="btn glass inline-block">Volver a la lista</a>
+  </div>
+{% endblock %}

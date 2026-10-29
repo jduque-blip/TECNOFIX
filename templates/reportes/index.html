@@ -1,0 +1,37 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  <form method="get" class="glass rounded-2xl p-4 mb-4 flex gap-3 items-end flex-wrap" id="rango">
+    <div><label for="desde" class="text-sm opacity-70 block">Desde</label><input id="desde" name="desde" type="date" value="{{ desde }}" max="{{ hoy }}" class="inp"></div>
+    <div><label for="hasta" class="text-sm opacity-70 block">Hasta</label><input id="hasta" name="hasta" type="date" value="{{ hasta }}" max="{{ hoy }}" class="inp"></div>
+    <span class="text-sm opacity-70">Elige el período y descarga el reporte que necesites.</span>
+  </form>
+
+  <div class="grid md:grid-cols-2 gap-3">
+    {% for clave, titulo, descripcion, usa_fechas in reportes %}
+    <section class="glass rounded-2xl p-4 space-y-2">
+      <h3 class="font-extrabold">{{ titulo }}</h3>
+      <p class="text-sm opacity-70">{{ descripcion }}{% if not usa_fechas %} Siempre muestra la situación de hoy.{% endif %}</p>
+      <div class="flex gap-2">
+        <a href="{% url 'reporte_descargar' clave 'pdf' %}" data-rango target="_blank" rel="noopener" class="btn g3 t text-sm">Ver PDF</a>
+        <a href="{% url 'reporte_descargar' clave 'csv' %}" data-rango class="btn glass text-sm">Descargar Excel (CSV)</a>
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  <script>
+    // Los botones llevan las fechas elegidas
+    (function () {
+      var d = document.getElementById('desde'), h = document.getElementById('hasta');
+      function actualizar() {
+        document.querySelectorAll('[data-rango]').forEach(function (a) {
+          var base = a.getAttribute('href').split('?')[0];
+          a.setAttribute('href', base + '?desde=' + encodeURIComponent(d.value) + '&hasta=' + encodeURIComponent(h.value));
+        });
+      }
+      d.addEventListener('change', actualizar); h.addEventListener('change', actualizar); actualizar();
+    })();
+  </script>
+{% endblock %}

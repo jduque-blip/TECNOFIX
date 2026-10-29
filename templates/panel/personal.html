@@ -1,0 +1,37 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos %}
+
+{% block panel %}
+  <form method="post" action="{% url 'personal' %}" class="glass rounded-2xl p-5 grid sm:grid-cols-4 gap-3 items-start" novalidate>
+    {% csrf_token %}
+    {% include 'parciales/_campo.html' with campo=form.nombre icono='user' ph='Nombre' auto='off' %}
+    {% include 'parciales/_campo.html' with campo=form.email icono='mail' ph='Correo' tipo='email' auto='off' %}
+    {% include 'parciales/_campo.html' with campo=form.telefono icono='phone' ph='WhatsApp (09…)' tipo='tel' auto='off' %}
+    <button type="submit" class="btn g3 t">+ Registrar técnico</button>
+  </form>
+  <p class="text-xs opacity-70 mt-2">La contraseña temporal se genera sola y se envía por WhatsApp al celular que registres.</p>
+
+  <form method="get" class="my-3">
+    <input name="q" class="inp" placeholder="Buscar personal por nombre o correo" value="{{ q }}" data-buscar autocomplete="off">
+  </form>
+
+  {% for u in pagina %}
+    <div class="glass rounded-2xl p-4 mb-2 flex justify-between items-center gap-3 flex-wrap">
+      <div>
+        {% ico 'wrench' 'w-5 h-5 inline -mt-1 opacity-70' %}
+        <b>{{ u.nombre }}</b>
+        <span class="opacity-70 text-sm">{{ u.email }} {% if u.telefono %}· {{ u.telefono }}{% else %}· <span class="text-amber-500">sin WhatsApp</span>{% endif %} · {{ u.activos }} activo{{ u.activos|pluralize }}</span>
+        {% if not u.is_active %}<span class="bg-slate-500 text-white text-xs rounded-full px-2 py-1">Desactivado</span>{% endif %}
+      </div>
+      <div class="flex gap-2 items-center">
+        {% if u.enlace_whatsapp %}<a href="{{ u.enlace_whatsapp }}" target="_blank" rel="noopener" class="btn glass text-sm inline-flex items-center gap-1" title="Escribir por WhatsApp">{% ico 'chat' 'w-4 h-4' %}WhatsApp</a>{% endif %}
+        {% if u.is_active %}<a href="{% url 'chat' u.pk %}" class="btn glass text-sm inline-flex items-center gap-1" title="Enviar mensaje interno">{% ico 'message' 'w-4 h-4' %}Mensaje</a>{% endif %}
+        {% include 'parciales/_acciones_usuario.html' with volver=request.get_full_path %}
+      </div>
+    </div>
+  {% empty %}
+    <p class="opacity-60">{% if q %}No hay personal que coincida con la búsqueda.{% else %}Aún no hay técnicos registrados.{% endif %}</p>
+  {% endfor %}
+
+  {% include 'parciales/_paginador.html' %}
+{% endblock %}

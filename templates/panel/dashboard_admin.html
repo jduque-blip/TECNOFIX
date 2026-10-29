@@ -1,0 +1,32 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos formato %}
+
+{% block panel %}
+  {# Indicadores #}
+  <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+    <a href="{% url 'ordenes' %}" class="glass rounded-2xl p-4 block"><div class="text-sm opacity-70">Órdenes activas</div><div class="text-3xl font-extrabold">{{ kpis.activas }}</div>{% if kpis.sin_tecnico %}<div class="text-xs text-amber-500 font-bold">{{ kpis.sin_tecnico }} sin técnico</div>{% endif %}{% if kpis.fecha_cambiada %}<div class="text-xs opacity-70">{{ kpis.fecha_cambiada }} con la fecha de entrega cambiada</div>{% endif %}</a>
+    <a href="{% url 'ordenes' %}?estado=LISTO" class="glass rounded-2xl p-4 block"><div class="text-sm opacity-70">Listas por cobrar</div><div class="text-3xl font-extrabold">{{ kpis.por_cobrar }}</div>{% if kpis.pagos_por_validar %}<div class="text-xs text-amber-500 font-bold">{{ kpis.pagos_por_validar }} comprobante{{ kpis.pagos_por_validar|pluralize }} por validar</div>{% endif %}</a>
+    <a href="{% url 'gastos' %}" class="glass rounded-2xl p-4 block"><div class="text-sm opacity-70">Ingresos del mes</div><div class="text-3xl font-extrabold text-emerald-500">{{ kpis.ingresos_mes|dinero }}</div><div class="text-xs opacity-70">Utilidad: <b class="{% if kpis.utilidad_mes < 0 %}text-rose-500{% endif %}">{{ kpis.utilidad_mes|dinero }}</b></div></a>
+    <a href="{% url 'gastos' %}" class="glass rounded-2xl p-4 block"><div class="text-sm opacity-70">Dinero en caja</div><div class="text-3xl font-extrabold {% if kpis.caja < 0 %}text-rose-500{% endif %}">{{ kpis.caja|dinero }}</div>{% if kpis.stock_bajo %}<div class="text-xs text-amber-500 font-bold">{{ kpis.stock_bajo }} producto{{ kpis.stock_bajo|pluralize }} con stock bajo</div>{% endif %}</a>
+    <a href="{% url 'ordenes' %}?estado=CANCELADA" class="glass rounded-2xl p-4 block"><div class="text-sm opacity-70">Canceladas / rechazadas</div><div class="text-3xl font-extrabold">{{ kpis.canceladas }} / {{ kpis.rechazadas }}</div><div class="text-xs opacity-70">Canceladas: las deja el cliente. <a class="underline" href="{% url 'ordenes' %}?estado=RECHAZADA">Ver rechazadas</a></div></a>
+  </div>
+
+  {# Gráficos #}
+  <div class="grid md:grid-cols-2 gap-4 items-start" id="graficos">
+    {% for id, titulo, nota in tarjetas %}
+    <section class="glass rounded-2xl p-4{% if id == 'ingresos_gastos' %} md:col-span-2{% endif %}">
+      <h3 class="font-extrabold">{{ titulo }}</h3>
+      <p class="text-xs opacity-60 mb-2">{{ nota }}</p>
+      <div class="relative h-64"><canvas data-grafico="{{ id }}" role="img" aria-label="{{ titulo }}"></canvas><p class="absolute inset-0 hidden items-center justify-center text-sm opacity-60" data-vacio>Todavía no hay datos.</p></div>
+    </section>
+    {% endfor %}
+  </div>
+
+  {{ graficos|json_script:"datos-dashboard" }}
+  <script src="/static/js/vendor/chart.umd.js"></script>
+  <script src="/static/js/dashboard.js?v=3"></script>
+
+  {% if user.is_staff %}
+    <a href="{% url 'admin:index' %}" class="btn glass text-sm inline-block mt-4">Administrar datos (Django)</a>
+  {% endif %}
+{% endblock %}

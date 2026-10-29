@@ -1,0 +1,75 @@
+{% load formato %}
+{# Acciones del administrador sobre el cierre de una orden: rechazar, reabrir con descuento o cerrar sin reparar. #}
+{% if orden.congelada %}
+<div class="rounded-3xl p-6 border border-rose-500/40 bg-rose-500/10 space-y-4" id="orden-cerrada">
+  <h3 class="font-extrabold">Orden {{ orden.get_estado_display|lower }}{% if orden.estado == 'CANCELADA' %} por el cliente{% else %} por la administración{% endif %}</h3>
+  {% if orden.motivo_cierre %}<p class="text-sm"><b>Motivo:</b> {{ orden.motivo_cierre }}</p>{% endif %}
+  <p class="text-sm">El técnico no puede hacer cambios. Habla con el cliente por el chat y decide:</p>
+  <form method="post" action="{% url 'orden_reabrir' orden.pk %}" class="space-y-2 rounded-2xl bg-slate-500/10 p-4">
+    {% csrf_token %}
+    <b class="text-sm">Reabrir la orden (se acordó algo con el cliente)</b>
+    <div class="flex gap-2 flex-wrap items-center">
+      <input name="descuento" inputmode="decimal" placeholder="Descuento $ (opcional)" class="inp !w-60" aria-label="Descuento en dólares">
+      <label class="text-sm inline-flex items-center gap-2"><input type="checkbox" name="sin_mano_obra"> No cobrar la mano de obra ({{ mano_de_obra|dinero }})</label>
+      <span class="text-xs opacity-70">Se suma al descuento en dólares de la izquierda.</span>
+    </div>
+    <input name="motivo" maxlength="200" class="inp w-full" placeholder="Motivo del descuento, si lo hay (saldrá en la factura)" aria-label="Motivo del descuento">
+    <button class="btn g3 t text-sm" data-confirmar="¿Reabrir la orden? El técnico podrá continuar.">Reabrir y avisar al técnico</button>
+    <p class="text-xs opacity-60">Volverá a «{% if orden.estado_previo %}{{ orden.estado_previo|title }}{% else %}Diagnóstico{% endif %}». El descuento baja el total de la factura (y el IVA en proporción).</p>
+  </form>
+  <form method="post" action="{% url 'orden_terminar' orden.pk %}" class="space-y-2 rounded-2xl bg-slate-500/10 p-4">
+    {% csrf_token %}
+    <b class="text-sm">Cerrar sin reparar y devolver el equipo</b>
+    <p class="text-xs opacity-70">La orden seguirá figurando como «{{ orden.get_estado_display }}» aunque se entregue el equipo. Elige qué se le cobra al cliente (sin IVA):</p>
+    <div class="grid gap-1 text-sm">
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="mantener" checked> Dejar como está{% if orden.cargo_cancelacion > 0 %} (ahora {{ orden.cargo_cancelacion|dinero }}){% else %} (ahora no se cobra nada){% endif %}</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="nada"> No cobrar nada (por ejemplo, faltó una pieza)</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="diagnostico"> Cobrar solo el diagnóstico ({{ diagnostico|dinero }})</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="mano"> Cobrar la mano de obra del presupuesto ({{ mano_de_obra|dinero }})</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="otro"> Otro valor: <input name="cargo" inputmode="decimal" placeholder="Ej. 20.00" class="inp !w-32" aria-label="Otro valor a cobrar"></label>
+    </div>
+    {% if items_cierre %}
+    <div class="rounded-xl bg-sky-500/10 p-3 text-sm space-y-1">
+      <b>Repuestos del presupuesto aceptado</b>
+      <p class="text-xs opacity-70">Se cobran solo los que el técnico usó. Los que no usó no se cobran y vuelven al inventario al cerrar.</p>
+      {% for i in items_cierre %}<div>{{ i.cantidad }} × {{ i.producto.nombre }} · {% if i.devuelto_en %}no se usó (devuelto al inventario){% elif i.en_uso_en %}<b>usado: se cobra</b>{% else %}no se ha usado: no se cobra{% endif %}</div>{% endfor %}
+    </div>
+    {% endif %}
+    {% if usos_cobrables %}
+    <div class="rounded-xl bg-amber-500/10 p-3 text-sm space-y-1">
+      <input type="hidden" name="usos_listados" value="1">
+      <b>Repuestos que el técnico ya usó</b>
+      <p class="text-xs opacity-70">Marca los que se le cobran al cliente (a su precio de venta, más IVA), además de lo de arriba. Los que desmarques no se cobran.</p>
+      {% for u in usos_cobrables %}
+      <label class="flex items-center gap-2"><input type="checkbox" name="cobrar_uso" value="{{ u.pk }}" checked> {{ u.cantidad }} × {{ u.producto.nombre }} · {{ u.precio_unit|dinero }} c/u</label>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <button class="btn glass text-sm" data-confirmar="¿Cerrar el caso sin reparar? Quedará «Listo» para que el cliente pague lo que corresponda (o retire sin cobro) y se entregue el equipo.">Cerrar sin reparar</button>
+  </form>
+</div>
+{% elif orden.resultado %}
+<div class="rounded-3xl p-4 border border-rose-500/40 bg-rose-500/10 text-sm" id="orden-cerrada">
+  <b>Orden {% if orden.resultado == 'CANCELADA' %}cancelada por el cliente{% else %}rechazada por la administración{% endif %}</b>
+  · {% if orden.estado == 'ENTREGADO' %}equipo devuelto al cliente{% else %}equipo listo para devolver{% endif %}
+  {% if orden.cargo_cancelacion > 0 %}· cobro: {{ orden.cargo_cancelacion|dinero }} + IVA{% else %}· sin cobro por el cierre{% endif %}
+  {% if orden.motivo_cierre %}<br>Motivo: {{ orden.motivo_cierre }}{% endif %}
+</div>
+{% elif puede_rechazar %}
+<details class="glass rounded-3xl p-6">
+  <summary class="font-extrabold cursor-pointer">Rechazar esta orden</summary>
+  <form method="post" action="{% url 'orden_rechazar' orden.pk %}" class="space-y-2 mt-3">
+    {% csrf_token %}
+    <p class="text-xs opacity-70">Úsalo si el equipo no tiene arreglo o no se puede atender. El técnico ya no podrá hacer cambios y el cliente verá el motivo.</p>
+    <input name="motivo" maxlength="300" class="inp w-full" placeholder="Motivo (el cliente lo verá)" aria-label="Motivo del rechazo">
+    <fieldset class="grid gap-1 text-sm">
+      <legend class="text-xs font-bold mb-1">¿Qué se le cobra al cliente? (sin IVA)</legend>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="nada" checked> No cobrar nada</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="diagnostico"> Solo el diagnóstico ({{ diagnostico|dinero }})</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="mano"> La mano de obra del presupuesto ({{ mano_de_obra|dinero }})</label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="cobro" value="otro"> Otro valor: <input name="cargo" inputmode="decimal" placeholder="Ej. 20.00" class="inp !w-32" aria-label="Otro valor a cobrar"></label>
+    </fieldset>
+    <button class="btn glass text-sm text-rose-500" data-confirmar="¿Rechazar la orden?">Rechazar la orden</button>
+  </form>
+</details>
+{% endif %}

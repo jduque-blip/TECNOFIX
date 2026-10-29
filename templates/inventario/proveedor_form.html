@@ -1,0 +1,15 @@
+{% extends 'panel/admin_base.html' %}
+{% block panel %}
+  {% include 'inventario/_subtabs.html' with sub='prv' %}
+  <form method="post" class="glass rounded-2xl p-5 space-y-3" novalidate>
+    {% csrf_token %}
+    <h3 class="font-extrabold">Editar «{{ proveedor.nombre }}»</h3>
+    <div class="grid sm:grid-cols-3 gap-3 items-start">
+      {% include 'parciales/_campo.html' with campo=form.nombre icono='users' ph='Nombre del proveedor' %}
+      {% include 'parciales/_campo.html' with campo=form.telefono icono='phone' ph='Teléfono (opcional)' tipo='tel' %}
+      {% include 'parciales/_campo.html' with campo=form.dias_entrega icono='calendar' ph='Días de entrega (opcional)' tipo='number' step='1' minimo='0' %}
+    </div>
+    {% include 'inventario/_categorias_checks.html' with campo=form.categorias %}
+    <div class="flex gap-2"><button type="submit" class="btn g3 t">Guardar</button><a href="{% url 'proveedores' %}" class="btn glass">Cancelar</a></div>
+  </form>
+{% endblock %}

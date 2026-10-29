@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load iconos %}
+
+{% block titulo %}Editar solicitud #{{ orden.pk }} · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+    <a href="{% url 'equipo' orden.pk %}" class="btn glass inline-flex items-center gap-2 text-sm">← Volver al equipo</a>
+
+    <form method="post" enctype="multipart/form-data" novalidate class="glass rounded-3xl p-8 space-y-3">
+      {% csrf_token %}
+      <h2 class="text-2xl font-extrabold">Editar solicitud #{{ orden.pk }}</h2>
+      <p class="text-sm opacity-70">Puedes corregirla hasta que se asigne un técnico.</p>
+
+      <div>
+        {{ form.servicio }}
+        {% if form.servicio.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form.servicio.errors.0 }}</p>{% endif %}
+      </div>
+      {% include 'parciales/_campo.html' with campo=form.modelo icono='laptop' ph='Modelo del equipo' auto='off' %}
+      <div>
+        {{ form.problema }}
+        {% if form.problema.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form.problema.errors.0 }}</p>{% endif %}
+      </div>
+
+      {% if fotos %}
+        <div>
+          <div class="text-sm opacity-70 mb-2">Fotos actuales (marca las que quieras quitar)</div>
+          <div class="flex gap-3 flex-wrap">
+            {% for f in fotos %}
+              <label class="relative cursor-pointer">
+                <img src="{{ f.imagen.url }}" alt="Foto {{ forloop.counter }}" class="w-24 h-24 object-cover rounded-xl">
+                <span class="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-xs rounded-lg px-2 py-1 flex items-center gap-1">
+                  <input type="checkbox" name="quitar" value="{{ f.pk }}"> Quitar
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="inp flex items-center gap-2 cursor-pointer{% if form.fotos.errors %} border-rose-500{% endif %}">
+          {% ico 'camera' 'w-5 h-5 shrink-0 opacity-70' %}
+          <span data-nombre-archivo class="truncate opacity-70">Añadir más fotos (puedes elegirlas de a una)</span>
+          <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple class="hidden" data-fotos data-vista="#vista-fotos" data-aviso="#aviso-fotos" data-max="4" data-max-mb="3">
+        </label>
+        <div id="vista-fotos" class="flex gap-3 flex-wrap mt-3 pt-1"></div>
+        <p id="aviso-fotos" class="text-xs text-rose-500 mt-1 px-1" role="status"></p>
+        {% if form.fotos.errors %}<p class="text-xs text-rose-500 mt-1 px-1">{{ form.fotos.errors.0 }}</p>{% endif %}
+        <p class="text-xs opacity-60 mt-1 px-1">Máximo 4 fotos en total · JPG, PNG o WEBP · 3 MB cada una.</p>
+      </div>
+
+      <div class="flex gap-2">
+        <button type="submit" class="btn g1 t">Guardar cambios</button>
+        <a href="{% url 'equipo' orden.pk %}" class="btn glass">Cancelar</a>
+      </div>
+    </form>
+  </main>
+{% endblock %}

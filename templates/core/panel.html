@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load iconos %}
+
+{% block titulo %}Mi panel · TecnoFix{% endblock %}
+
+{% block contenido %}
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% if user.es_cliente %}
+      <div class="g1 text-white rounded-3xl p-6 flex justify-between items-center gap-4 flex-wrap">
+        <div>
+          <h2 class="text-2xl font-extrabold">Hola, {{ user.nombre }}</h2>
+          <p class="opacity-90">{{ en_proceso|length }} equipo{{ en_proceso|length|pluralize }} en proceso</p>
+        </div>
+        <button type="button" data-abrir-modal="modal-solicitud" class="btn bg-white text-slate-900 font-bold inline-flex items-center gap-2">{% ico 'plus' 'w-5 h-5' %}Solicitar servicio</button>
+      </div>
+    {% else %}
+      <div class="g2 text-white rounded-3xl p-6">
+        <h2 class="text-2xl font-extrabold">Panel técnico · {{ user.nombre }}</h2>
+        <p class="opacity-90">{{ resumen.abiertas }} orden{{ resumen.abiertas|pluralize:",es" }} abierta{{ resumen.abiertas|pluralize }}</p>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+        <div class="glass rounded-2xl p-4"><div class="text-3xl font-extrabold">{{ resumen.abiertas }}</div><div class="text-sm opacity-70">Abiertas</div></div>
+        <div class="glass rounded-2xl p-4 {% if resumen.atrasadas %}border border-rose-500{% endif %}"><div class="text-3xl font-extrabold {% if resumen.atrasadas %}text-rose-500{% endif %}">{{ resumen.atrasadas }}</div><div class="text-sm opacity-70">Atrasadas</div></div>
+        <div class="glass rounded-2xl p-4"><div class="text-3xl font-extrabold">{{ resumen.listas }}</div><div class="text-sm opacity-70">Listas para entregar</div></div>
+        <div class="glass rounded-2xl p-4"><div class="text-3xl font-extrabold">{% if resumen.cumplimiento is None %}—{% else %}{{ resumen.cumplimiento }}%{% endif %}</div><div class="text-sm opacity-70">Entregas a tiempo ({{ resumen.entregadas }} entregada{{ resumen.entregadas|pluralize }})</div></div>
+      </div>
+    {% endif %}
+
+    <div class="grid lg:grid-cols-3 gap-5 mt-5">
+      <section class="lg:col-span-2">
+        <h3 class="font-extrabold text-lg mb-3 inline-flex items-center gap-2">{% ico 'clipboard' 'w-5 h-5' %}{% if user.es_cliente %}Mis equipos{% else %}Mis órdenes asignadas{% endif %}</h3>
+        <form method="get" class="flex gap-2 flex-wrap mb-3" role="search">
+          <input name="q" class="inp flex-1 min-w-[10rem]" placeholder="Buscar por modelo, servicio o número{% if user.es_tecnico %}, o cliente{% endif %}" value="{{ q }}" data-buscar autocomplete="off">
+          <select name="estado" class="inp" data-autoenviar aria-label="Filtrar por estado">
+            <option value="">Todos los estados</option>
+            {% for valor, nombre in estados_filtro %}<option value="{{ valor }}"{% if valor == filtro_estado %} selected{% endif %}>{{ nombre }}</option>{% endfor %}
+          </select>
+        </form>
+        {% for o in en_proceso %}
+          {% include 'parciales/_tarjeta_orden.html' %}
+        {% empty %}
+          <div class="glass rounded-2xl p-6 text-center opacity-80">
+            {% if q or filtro_estado %}
+              Ninguna orden coincide con la búsqueda. <a href="{% url 'panel' %}" class="underline">Ver todas</a>
+            {% elif user.es_cliente %}
+              Aún no tienes equipos en proceso. Pulsa <b>Solicitar servicio</b> para empezar.
+            {% else %}
+              No tienes órdenes asignadas por ahora.
+            {% endif %}
+          </div>
+        {% endfor %}
+      </section>
+
+      <aside>
+        <h3 class="font-extrabold text-lg mb-3">Entregados</h3>
+        {% for o in entregados %}
+          <a href="{% url 'equipo' o.pk %}" class="glass rounded-xl px-3 py-2 mb-2 flex justify-between gap-2 text-sm">
+            <span class="truncate">#{{ o.pk }} · {{ o.modelo }}{% if o.cierre_visible %} {% include 'parciales/_estado.html' with orden=o %}{% endif %}</span>
+            <span class="opacity-60 whitespace-nowrap">{{ o.entregada_en|date:"d/m/Y" }}</span>
+          </a>
+        {% empty %}
+          <p class="text-sm opacity-60">Todavía no hay equipos entregados.</p>
+        {% endfor %}
+      </aside>
+    </div>
+  </main>
+{% endblock %}
+
+{% block modales %}
+  {% if user.es_cliente %}
+    {% include 'parciales/_modal_solicitud.html' %}
+  {% endif %}
+{% endblock %}

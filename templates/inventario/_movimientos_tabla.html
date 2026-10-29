@@ -1,0 +1,17 @@
+{% load iconos %}
+{% for m in lista %}
+  <div class="glass rounded-xl px-4 py-2 mb-2 flex items-center justify-between gap-3 flex-wrap text-sm">
+    <div>
+      <span class="rounded-full px-2 py-0.5 text-xs font-bold text-white {% if m.tipo == 'ENTRADA' %}bg-emerald-500{% elif m.tipo == 'SALIDA' %}bg-rose-500{% else %}bg-amber-500{% endif %}">{{ m.get_tipo_display }}</span>
+      {% if not sin_producto %}<a class="font-bold underline" href="{% url 'producto_detalle' m.producto_id %}">{{ m.producto.nombre }}</a>{% endif %}
+      <span class="opacity-80">{{ m.motivo|default:"—" }}</span>
+      {% if m.pedido and m.pedido.observacion %}<div class="text-xs mt-1 rounded-lg bg-slate-500/10 px-2 py-1 inline-flex items-start gap-1"><b>Nota:</b> {{ m.pedido.observacion }}</div>{% endif %}
+    </div>
+    <div class="text-right">
+      <b>{% if m.cantidad > 0 %}+{% endif %}{{ m.cantidad }}</b> → {{ m.stock_resultante }} en stock
+      <div class="text-xs opacity-60">{{ m.fecha|date:"d/m/Y H:i" }}{% if m.usuario %} · {{ m.usuario.nombre }}{% endif %}</div>
+    </div>
+  </div>
+{% empty %}
+  <div class="glass rounded-2xl p-6 text-center opacity-80">Todavía no hay movimientos.</div>
+{% endfor %}

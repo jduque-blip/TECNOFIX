@@ -1,0 +1,142 @@
+{% extends 'panel/admin_base.html' %}
+{% load iconos static formato %}
+
+{% block panel %}
+  <a href="{% url 'ordenes' %}" class="btn glass inline-flex items-center gap-2 text-sm mb-3">← Volver a las órdenes</a>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 space-y-4">
+      <nav class="flex gap-2 flex-wrap text-sm" aria-label="Ir a una sección">
+        <a href="#presupuestos" class="btn glass">Presupuesto y factura</a>
+        <a href="#piezas" class="btn glass">Piezas</a>
+        <a href="#repuestos-usados" class="btn glass">Repuestos usados</a>
+        <a href="#pago" class="btn glass">Pago y entrega</a>
+        <a href="#informe-danados" class="btn glass">Dañados</a>
+      </nav>
+      <div class="glass rounded-3xl p-6">
+        <div class="flex items-center gap-3 flex-wrap">
+          <h3 class="text-xl font-extrabold">#{{ orden.pk }} · {{ orden.modelo }}</h3>
+          {% include 'parciales/_estado.html' %}
+        </div>
+        <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 text-sm">
+          <div><dt class="opacity-60">Servicio</dt><dd class="font-semibold">{{ orden.servicio.nombre }}</dd></div>
+          <div><dt class="opacity-60">Recibida</dt><dd class="font-semibold">{{ orden.creada_en|date:"d/m/Y H:i" }}</dd></div>
+          <div><dt class="opacity-60">Cliente</dt><dd class="font-semibold">{{ orden.cliente.nombre }}</dd></div>
+          <div><dt class="opacity-60">Contacto</dt><dd class="font-semibold">{% if orden.cliente.telefono %}{{ orden.cliente.telefono }} · {% endif %}{{ orden.cliente.email }}</dd></div>
+        </dl>
+        <div class="flex gap-2 flex-wrap mt-4">
+          <a href="{% url 'chat' orden.cliente.pk %}?orden={{ orden.pk }}" class="btn g2 t text-sm inline-flex items-center gap-2">{% ico 'message' 'w-4 h-4' %}Contactar al cliente</a>
+          {% if contacto_tecnico %}<a href="{% url 'chat' contacto_tecnico.pk %}?orden={{ orden.pk }}" class="btn glass text-sm inline-flex items-center gap-2">{% ico 'message' 'w-4 h-4' %}Contactar al técnico</a>{% endif %}
+          {% if orden.cliente.enlace_whatsapp %}<a href="{{ orden.cliente.enlace_whatsapp }}" target="_blank" rel="noopener" class="btn glass text-sm inline-flex items-center gap-2">{% ico 'chat' 'w-4 h-4' %}WhatsApp</a>{% endif %}
+        </div>
+        <div class="mt-4">
+          <div class="opacity-60 text-sm">Problema</div>
+          <p class="whitespace-pre-line">{{ orden.problema }}</p>
+        </div>
+        {% if orden.fotos.all %}
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+            {% for f in orden.fotos.all %}
+              <a href="{{ f.imagen.url }}" target="_blank" rel="noopener"><img src="{{ f.imagen.url }}" alt="Foto {{ forloop.counter }}" loading="lazy" class="w-full h-28 object-cover rounded-xl"></a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      {% for sol in solicitudes %}{% if sol.estado == 'PENDIENTE' %}
+      <div class="glass rounded-3xl p-6 border border-amber-500">
+        <h3 class="font-extrabold mb-1">El técnico pide cambiar el estado</h3>
+        <p class="text-sm"><b>{{ sol.tecnico.nombre }}</b> quiere volver de <b>{{ sol.get_estado_actual_display }}</b> a <b>{{ sol.get_estado_pedido_display }}</b>.</p>
+        <p class="text-sm opacity-80 mt-1">Motivo: {{ sol.motivo }}</p>
+        <form method="post" action="{% url 'solicitud_responder' orden.pk sol.pk %}" class="mt-3 space-y-2">
+          {% csrf_token %}
+          <input name="respuesta" maxlength="300" class="inp w-full" placeholder="Si rechazas, dile por qué (opcional)">
+          <div class="flex gap-2 flex-wrap">
+            <button name="accion" value="aprobar" class="btn g3 t text-sm" data-confirmar="¿Aprobar? La orden volverá a {{ sol.get_estado_pedido_display }}.">Aprobar y cambiar estado</button>
+            <button name="accion" value="rechazar" class="btn glass text-sm text-rose-500">Rechazar</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}{% endfor %}
+
+      {% include 'panel/_cierre_admin.html' %}
+      {% include 'ordenes/_fechas.html' %}
+      {% include 'ordenes/_presupuestos.html' %}
+      {% include 'ordenes/_danados.html' %}
+    {% include 'ordenes/_pagos.html' %}
+
+      {% if fotos_avance %}
+        <details class="glass rounded-3xl p-6">
+          <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'camera' 'w-5 h-5' %}Fotos del avance</summary>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {% for f in fotos_avance %}<a href="{{ f.imagen.url }}" target="_blank" rel="noopener"><img src="{{ f.imagen.url }}" alt="Avance {{ forloop.counter }}" loading="lazy" class="w-full h-28 object-cover rounded-xl"></a>{% endfor %}
+          </div>
+        </details>
+      {% endif %}
+
+      {% if notas %}
+        <details class="glass rounded-3xl p-6">
+          <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'message' 'w-5 h-5' %}Notas del técnico</summary>
+          <ul class="space-y-3 text-sm">
+            {% for n in notas %}
+              <li><div class="opacity-60 text-xs">{{ n.creada_en|date:"d/m/Y H:i" }} · {{ n.autor.nombre|default:"Técnico" }}{% if not n.visible_cliente %} · <b>interna</b>{% endif %}</div><p class="whitespace-pre-line">{{ n.texto }}</p></li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+
+      <details class="glass rounded-3xl p-6">
+        <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2 mb-3">{% ico 'clipboard' 'w-5 h-5' %}Historial</summary>
+        <ul class="space-y-2 text-sm">
+          {% for h in historial %}
+            <li class="flex gap-3"><span class="opacity-60 whitespace-nowrap">{{ h.fecha|date:"d/m/Y H:i" }}</span><span>{{ h.evento }}{% if h.usuario %} <span class="opacity-60">· {{ h.usuario.nombre }}</span>{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </details>
+    </div>
+
+    <div class="space-y-4 self-start lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+    <form method="post" class="glass rounded-3xl p-6 space-y-3" novalidate>
+      {% csrf_token %}
+      <h3 class="font-extrabold inline-flex items-center gap-2">{% ico 'wrench' 'w-5 h-5' %}Gestionar orden</h3>
+      {% if bloqueada %}
+        <p class="text-sm opacity-80">{% if orden.congelada %}Esta orden está {{ orden.get_estado_display|lower }}. Usa el cuadro de arriba para reabrirla o cerrarla.{% else %}Esta orden ya fue entregada y no se puede modificar.{% endif %}</p>
+      {% else %}
+        {% for campo in form %}
+          <div>
+            <label for="{{ campo.id_for_label }}" class="text-sm opacity-70">{{ campo.label|default:campo.name|capfirst }}</label>
+            {{ campo }}
+            {% if campo.errors %}<p class="text-xs text-rose-500 mt-1">{{ campo.errors.0 }}</p>{% endif %}
+          </div>
+        {% endfor %}
+        <p class="text-xs opacity-60">Al asignar un técnico a una orden «Recibido», pasa sola a «En diagnóstico». La entrega se habilita cuando el pago esté confirmado.</p>
+        <button type="submit" class="btn g1 t w-full py-3">Guardar cambios</button>
+      {% endif %}
+    </form>
+    {% if puede_descuento %}
+    <details class="glass rounded-3xl p-6" {% if orden.tiene_descuento %}open{% endif %}>
+      <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'dollar' 'w-5 h-5' %}Descuento para el cliente{% if orden.tiene_descuento %} · activo{% endif %}</summary>
+      <form method="post" action="{% url 'orden_descuento' orden.pk %}" class="space-y-2 mt-3">
+        {% csrf_token %}
+        <p class="text-xs opacity-70"><b>Cuándo usarlo:</b> cuando negocias el precio con el cliente (por el chat o en persona). Lo puedes dejar listo desde que la orden está «Recibido», aunque el técnico aún no haya enviado su presupuesto: se aplica solo a cada presupuesto que llegue y el cliente lo ve como «Descuento acordado» antes de aceptar. Se puede quitar la mano de obra, restar un monto en dólares (sin IVA) o las dos cosas.</p>
+        <label class="text-sm inline-flex items-center gap-2"><input type="checkbox" name="sin_mano_obra"{% if orden.descuento_sin_mano %} checked{% endif %}> No cobrar la mano de obra{% if mano_de_obra %} ({{ mano_de_obra|dinero }}){% endif %}</label>
+        <input name="descuento" inputmode="decimal" placeholder="Descuento extra $ (ej. 15)" class="inp w-full" aria-label="Descuento en dólares" value="{% if orden.descuento > 0 %}{{ orden.descuento }}{% endif %}">
+        <input name="motivo" maxlength="200" class="inp w-full" placeholder="Motivo (lo verá el cliente)" aria-label="Motivo del descuento" value="{{ orden.descuento_motivo }}">
+        <button class="btn g3 t text-sm w-full">Guardar descuento</button>
+        <p class="text-xs opacity-60">Al guardar se reemplaza el descuento actual. Para quitarlo, desmarca la casilla, deja el monto vacío y guarda. Si el cliente rechaza un presupuesto que ya tiene descuento, la orden queda rechazada: es tu última oferta.</p>
+      </form>
+    </details>
+    {% endif %}
+    <details class="glass rounded-3xl p-6 space-y-2">
+      <summary class="font-extrabold cursor-pointer inline-flex items-center gap-2">{% ico 'wrench' 'w-5 h-5' %}Carga de los técnicos</summary>
+      <p class="text-xs opacity-60">Del más libre al más ocupado. Asigna al primero para repartir el trabajo por turnos.</p>
+      {% for u, texto in carga %}
+        <div class="rounded-xl bg-slate-500/10 p-2 text-sm flex items-start justify-between gap-2">
+          <div><b>{{ u.nombre }}</b>{% if u.pk == orden.tecnico_id %} <span class="text-xs opacity-70">(esta orden)</span>{% endif %}<div class="text-xs opacity-70">{{ texto }}</div></div>
+          {% if forloop.first %}<span class="rounded-full px-2 py-0.5 text-xs font-bold text-white bg-emerald-500 whitespace-nowrap">Más libre</span>{% endif %}
+        </div>
+      {% empty %}<p class="text-sm opacity-70">No hay técnicos registrados.</p>{% endfor %}
+    </details>
+    </div>
+  </div>
+  <script src="{% static 'js/presupuesto.js' %}?v=8"></script>
+{% endblock %}

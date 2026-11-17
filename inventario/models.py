@@ -171,6 +171,13 @@ class Pedido(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
     fecha = models.DateTimeField(default=timezone.now)
+    # Cómo estaba el producto justo antes del pedido: sirve para recalcular el costo promedio si el pedido se corrige.
+    stock_antes = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    costo_antes = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False)
+    # Constancia de una corrección administrativa (se anotó mal la cantidad): no es una pérdida.
+    cantidad_original = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    corregido_en = models.DateTimeField(null=True, blank=True, editable=False)
+    correccion_motivo = models.CharField(max_length=150, blank=True, editable=False)
 
     class Meta:
         ordering = ['-fecha']

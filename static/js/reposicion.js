@@ -8,6 +8,8 @@
   var resumen = f.querySelector('[data-resumen]');
   var venta = parseFloat(f.dataset.venta) || 0;
   var stock = parseInt(f.dataset.stock, 10) || 0;
+  var costo = parseFloat(f.dataset.costo) || 0;
+  var margen = parseFloat(f.dataset.margen) || 0;
   var dinero = function (n) { return '$' + n.toFixed(2); };
 
   function opciones() {
@@ -29,6 +31,12 @@
       var precios = lista.map(function (o) { return o.precio; });
       var ahorro = n * (Math.max.apply(null, precios) - Math.min.apply(null, precios));
       if (ahorro > 0) detalle += ' Comprando al más barato ahorras ' + dinero(ahorro) + ' frente al más caro.';
+    }
+    if (stock > 0 && costo > 0) {
+      var prom = Math.round((stock * costo + n * p) / (stock + n) * 100) / 100;
+      var sug = Math.ceil(prom * (1 + margen / 100) * 20) / 20;
+      detalle += ' Costo promedio nuevo: ' + dinero(prom) + ' (antes ' + dinero(costo) + '; quedan ' + stock + ' unidades al costo anterior). Precio sugerido: ' + dinero(sug) + '.';
+      if (venta > 0 && venta < prom) detalle += ' ¡Ojo! Tu precio de venta actual queda por debajo del costo.';
     }
     f.querySelector('[data-total]').textContent = dinero(n * p);
     f.querySelector('[data-detalle]').textContent = detalle;

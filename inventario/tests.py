@@ -206,7 +206,7 @@ class ReposicionTests(Base):
         self.assertRedirects(self.reponer(), self.url, fetch_redirect_response=False)
         self.prod.refresh_from_db()
         self.assertEqual(self.prod.stock, 15)
-        self.assertEqual(self.prod.costo_pedido, Decimal('32'))
+        self.assertEqual(self.prod.costo_pedido, Decimal('30.83'))  # promedio: 5 a 28.50 y 10 a 32
         pedido = Pedido.objects.get()
         self.assertEqual((pedido.cantidad, pedido.costo_total, pedido.usuario), (10, Decimal('320.00'), self.admin))
         m = self.prod.movimientos.first()
@@ -519,13 +519,14 @@ class HistorialPreciosTests(Base):
     def test_aviso_cuando_el_costo_sube(self):
         prod = self.crear()  # costo de pedido 28.50
         r = self.client.post(reverse('producto_detalle', args=[prod.pk]), {'accion': 'reponer', 'proveedor': self.p1.pk, 'cantidad': '4', 'precio_unit': '40'}, follow=True)
-        self.assertContains(r, 'El costo subió de $28.50 a $40')
+        self.assertContains(r, 'Costo promedio recalculado: de $28.50 a $33.61')
         self.assertContains(r, 'Precio sugerido')
 
     def test_sin_aviso_si_el_costo_baja(self):
         prod = self.crear()
         r = self.client.post(reverse('producto_detalle', args=[prod.pk]), {'accion': 'reponer', 'proveedor': self.p2.pk, 'cantidad': '4', 'precio_unit': '25'}, follow=True)
-        self.assertNotContains(r, 'El costo subió')
+        self.assertContains(r, 'Costo promedio recalculado: de $28.50 a $26.94')  # 5 a 28.50 y 4 a 25
+        self.assertNotContains(r, 'Puedes pulsar')
 
 
 class DiasEntregaTests(Base):
@@ -756,13 +757,13 @@ class FormularioProductoTests(Base):
         prod = self.crear()
         self.client.post(reverse('producto_detalle', args=[prod.pk]), {'accion': 'reponer', 'proveedor': self.p1.pk, 'cantidad': '2', 'precio_unit': '30'})
         prod.refresh_from_db()
-        self.assertEqual(prod.costo_pedido, Decimal('30'))  # lo pagado en el último pedido
+        self.assertEqual(prod.costo_pedido, Decimal('28.93'))  # promedio: 5 a 28.50 y 2 a 30
         d = self.datos()
         del d['stock_inicial']
         d['precio1'] = '30'
         self.client.post(reverse('producto_editar', args=[prod.pk]), d)
         prod.refresh_from_db()
-        self.assertEqual(prod.costo_pedido, Decimal('30'))
+        self.assertEqual(prod.costo_pedido, Decimal('28.93'))
 
     def test_editar_un_precio_recalcula_el_costo_de_pedido(self):
         prod = self.crear()

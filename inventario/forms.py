@@ -228,6 +228,7 @@ class ReponerForm(forms.Form):
     cantidad = _entero('Cantidad', minimo=1)
     precio_unit = _precio('Precio por unidad')
     observacion = forms.CharField(required=False, max_length=300, label='Observación')
+    actualizar_precio = forms.BooleanField(required=False, label='Actualizar el precio de venta al sugerido con el nuevo costo')
 
     def __init__(self, *args, producto, **kwargs):
         super().__init__(*args, **kwargs)
@@ -239,10 +240,23 @@ class ReponerForm(forms.Form):
 
 class AjusteForm(forms.Form):
     stock_real = _entero('Stock real')
+    error_registro = forms.BooleanField(required=False, label='Fue un error de registro (no es una pérdida)')
     motivo = forms.CharField(max_length=150, label='Motivo', error_messages={'required': 'Explica el motivo del ajuste.'})
 
     def clean_motivo(self):
         motivo = ' '.join(self.cleaned_data['motivo'].split())
         if len(motivo) < 4:
             raise forms.ValidationError('Explica el motivo del ajuste.')
+        return motivo
+
+
+class CorregirPedidoForm(forms.Form):
+    """El administrador anotó mal la cantidad del último pedido: se corrige sin que cuente como pérdida."""
+    cantidad_correcta = _entero('Cantidad correcta', minimo=1)
+    motivo = forms.CharField(max_length=100, label='Qué pasó', error_messages={'required': 'Explica qué pasó (por ejemplo, escribí 4 y eran 2).'})
+
+    def clean_motivo(self):
+        motivo = ' '.join(self.cleaned_data['motivo'].split())
+        if len(motivo) < 4:
+            raise forms.ValidationError('Explica qué pasó (por ejemplo, escribí 4 y eran 2).')
         return motivo

@@ -118,10 +118,14 @@
             <option value="">Todas las categorías</option>
             {% for c in categorias_inventario %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
           </select>
-          <select name="producto" class="inp flex-1 min-w-[10rem]" aria-label="Repuesto">
-            <option value="">— Elige un repuesto —</option>
-            {% for r in repuestos_disp %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-precio="{{ r.precio_venta|unlocalize }}" data-stock="{{ r.stock }}">{{ r.nombre }} · {{ r.precio_venta|dinero }} ({{ r.stock }} disp.)</option>{% endfor %}
-          </select>
+          <div class="flex-1 min-w-[12rem] space-y-1">
+            <input type="search" class="inp w-full" placeholder="Buscar repuesto: nombre, marca o código…" aria-label="Buscar repuesto" data-buscar-fila autocomplete="off">
+            <select name="producto" class="inp w-full" aria-label="Repuesto">
+              <option value="">— Elige un repuesto —</option>
+              {% for r in repuestos_disp %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-precio="{{ r.precio_venta|unlocalize }}" data-stock="{{ r.stock }}" data-texto="{{ r.nombre }} {{ r.marca }} {{ r.codigo }}">{{ r.nombre }}{% if r.marca %} · {{ r.marca }}{% endif %} · {{ r.precio_venta|dinero }} ({{ r.stock }} disp.)</option>{% endfor %}
+            </select>
+            <p class="text-xs opacity-70" data-aviso-fila aria-live="polite"></p>
+          </div>
           <input type="number" name="cantidad_producto" min="1" max="100" step="1" value="1" class="inp !w-20 text-right" aria-label="Cantidad">
           <button type="button" class="text-rose-500 px-2" data-quitar aria-label="Quitar repuesto">×</button>
         </div>
@@ -325,11 +329,12 @@
       <option value="">Todas las categorías</option>
       {% for c in categorias_inventario %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
     </select>
-    <input type="search" class="inp w-full" placeholder="Escribe para buscar (nombre o código)" aria-label="Buscar repuesto" data-filtro>
+    <input type="search" class="inp w-full" placeholder="Escribe para buscar: nombre, marca o código…" aria-label="Buscar repuesto" data-filtro autocomplete="off">
+    <p class="text-xs opacity-70" data-aviso aria-live="polite"></p>
     <div class="flex gap-2">
       <select name="producto" class="inp flex-1" aria-label="Repuesto" data-lista>
         <option value="">— Elige un repuesto —</option>
-        {% for r in productos_uso %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-texto="{{ r.nombre|lower }} {{ r.codigo|lower }}">{{ r.nombre }} · {{ r.codigo }} ({{ r.stock }} disp.)</option>{% endfor %}
+        {% for r in productos_uso %}<option value="{{ r.pk }}" data-categoria="{{ r.categoria_id|default:'' }}" data-texto="{{ r.nombre }} {{ r.marca }} {{ r.codigo }}">{{ r.nombre }}{% if r.marca %} · {{ r.marca }}{% endif %} · {{ r.codigo }} ({{ r.stock }} disp.)</option>{% endfor %}
       </select>
       <input type="number" name="cantidad" min="1" max="100" value="1" class="inp !w-20 text-right" aria-label="Cantidad">
     </div>

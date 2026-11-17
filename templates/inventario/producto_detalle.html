@@ -53,7 +53,7 @@
     <section class="glass rounded-2xl p-5">
       <h4 class="font-extrabold mb-1 inline-flex items-center gap-2">{% ico 'refresh' 'w-5 h-5' %}Reponer stock</h4>
       {% if cotizaciones %}
-        <p class="text-xs opacity-70 mb-2">Registra un pedido a uno de sus proveedores. El costo de pedido pasa a ser el precio de este pedido.</p>
+        <p class="text-xs opacity-70 mb-2">Aquí registras lo que compraste a un proveedor. Al guardar, suben el stock, el gasto en Finanzas y el costo del producto (se explica abajo en «¿Cómo funciona?»).</p>
         <div class="overflow-x-auto mb-3">
           <table class="w-full text-sm">
             <thead class="opacity-70 text-left"><tr><th class="py-1 pr-2">Proveedor</th><th class="pr-2">Precio</th><th class="pr-2">Vender a</th><th>Ganancia</th></tr></thead>
@@ -71,7 +71,7 @@
           </table>
           <p class="text-xs opacity-60 mt-1">«Vender a» es el precio que convendría con ese proveedor según el margen objetivo. «Ganancia» es con tu precio de venta actual.</p>
         </div>
-        <form method="post" class="space-y-2" novalidate data-reposicion data-venta="{{ producto.precio_venta|unlocalize }}" data-stock="{{ producto.stock }}">
+        <form method="post" class="space-y-2" novalidate data-reposicion data-venta="{{ producto.precio_venta|unlocalize }}" data-stock="{{ producto.stock }}" data-costo="{{ producto.costo_pedido|unlocalize }}" data-margen="{{ producto.margen_objetivo|unlocalize }}">
           {% csrf_token %}
           <input type="hidden" name="accion" value="reponer">
           {% if f_reponer.non_field_errors %}<p class="text-xs text-rose-500">{{ f_reponer.non_field_errors.0 }}</p>{% endif %}
@@ -89,22 +89,55 @@
           </div>
           {% include 'parciales/_campo.html' with campo=f_reponer.observacion icono='clipboard' ph='Nota del pedido (opcional): factura, quién entregó…' %}
           <p class="text-xs opacity-60 px-1">La nota se muestra en «Últimos movimientos» de este producto y en el historial general.</p>
+          <label class="flex items-start gap-2 text-sm px-1 rounded-xl bg-slate-500/10 p-3"><input type="checkbox" name="actualizar_precio" value="1" class="mt-1"{% if f_reponer.actualizar_precio.value %} checked{% endif %}><span><b>Cambiar también el precio de venta</b> al «precio sugerido» que sale con el costo nuevo. <span class="opacity-70">Déjalo sin marcar si prefieres conservar el precio actual ({{ producto.precio_venta|dinero }}).</span></span></label>
           <button type="submit" class="btn g3 t">Registrar reposición</button>
         </form>
       {% else %}
         <p class="text-sm opacity-80">Este producto no tiene proveedores. <a class="underline" href="{% url 'producto_editar' producto.pk %}">Asigna uno</a> para poder reponerlo.</p>
       {% endif %}
+
+      <details class="mt-3 rounded-xl bg-slate-500/10 p-3 text-sm">
+        <summary class="cursor-pointer font-bold">¿Cómo funciona? (léelo una vez)</summary>
+        <div class="mt-2 space-y-2 opacity-90">
+          <p><b>1. Qué pasa al pulsar «Registrar reposición».</b> El sistema hace cuatro cosas juntas: (a) anota el pedido con su proveedor, cantidad y precio; (b) suma las unidades al stock y lo deja escrito en el kardex; (c) crea el gasto «Reposición» en Finanzas por cantidad × precio, es decir, lo que de verdad pagaste; (d) recalcula el costo del producto.</p>
+          <p><b>2. Por qué el costo se «promedia».</b> Si en la estantería hay unidades que compraste más caras y ahora llegan otras más baratas (o al revés), todas se venden al mismo precio. Para no ganar de menos, el costo es el promedio de todo lo que tienes. <i>Ejemplo:</i> tienes 4 unidades que costaron $30 y compras 4 a $20 → el costo pasa a ser ($30×4 + $20×4) ÷ 8 = <b>$25</b>, no $20. Así, el precio sugerido cubre también las unidades caras y no hay pérdida.</p>
+          <p><b>3. Y el precio de venta.</b> «Precio sugerido» = costo + margen. El sistema <u>no cambia</u> tu precio de venta solo, a menos que marques «Cambiar también el precio de venta». Si tu precio queda por debajo del costo, el sistema te avisa. Ahora mismo tienes <b>{{ producto.stock }}</b> unidad{{ producto.stock|pluralize:"es" }} con un costo de <b>{{ producto.costo_pedido|dinero }}</b>.</p>
+          <p><b>4. Si te equivocas.</b> Hay dos herramientas, según el error:</p>
+          <ul class="list-disc pl-5">
+            <li><b>Anotaste mal la cantidad del último pedido</b> (escribiste 4 y eran 2) → usa «Corregir el último pedido», justo abajo. Arregla de una vez el stock, el gasto de Finanzas y el costo. <u>No cuenta como pérdida</u>.</li>
+            <li><b>El conteo en estantería no coincide</b> por otra razón → usa «Ajustar stock» (a la derecha). Si fue un descuido tuyo al anotar, marca «Fue un error de registro» para que tampoco cuente como pérdida; si de verdad se dañó o se perdió, déjalo sin marcar y quedará como pérdida.</li>
+          </ul>
+        </div>
+      </details>
+
+      {% if ultimo_pedido %}
+      <details class="mt-3 rounded-xl bg-slate-500/10 p-3 text-sm"{% if f_corregir.errors %} open{% endif %}>
+        <summary class="cursor-pointer font-bold">Corregir el último pedido (me equivoqué al anotarlo)</summary>
+        <p class="text-xs opacity-80 my-2">Último pedido: <b>{{ ultimo_pedido.cantidad }} × {{ ultimo_pedido.precio_unit|dinero }}</b> a {{ ultimo_pedido.proveedor.nombre }} ({{ ultimo_pedido.fecha|date:"d/m/Y" }}).
+          {% if ultimo_pedido.cantidad_original %}<span class="text-amber-500">Ya fue corregido: se había anotado {{ ultimo_pedido.cantidad_original }}.</span>{% endif %}
+          Escribe la cantidad correcta. Se ajustan el stock, el gasto de Finanzas y el costo promedio; en el kardex queda constancia del error y <b>no cuenta como pérdida</b>. Solo se puede corregir el último pedido de este producto.</p>
+        <form method="post" class="space-y-2" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="corregir_pedido">
+          {% if f_corregir.non_field_errors %}<p class="text-xs text-rose-500">{{ f_corregir.non_field_errors.0 }}</p>{% endif %}
+          {% include 'parciales/_campo.html' with campo=f_corregir.cantidad_correcta icono='plus' ph='Cantidad correcta del pedido' tipo='number' step='1' minimo='1' %}
+          {% include 'parciales/_campo.html' with campo=f_corregir.motivo icono='tag' ph='Qué pasó: escribí 4 y eran 2' %}
+          <button type="submit" class="btn g4 t" data-confirmar="¿Corregir el pedido? El stock y el gasto se ajustarán.">Corregir pedido</button>
+        </form>
+      </details>
+      {% endif %}
     </section>
 
     <section class="glass rounded-2xl p-5">
       <h4 class="font-extrabold mb-1 inline-flex items-center gap-2">{% ico 'clipboard' 'w-5 h-5' %}Ajustar stock</h4>
-      <p class="text-xs opacity-70 mb-2">Úsalo cuando el conteo real no coincide (daño, pérdida, conteo físico). Queda registrado con tu nombre.</p>
+      <p class="text-xs opacity-70 mb-2">Úsalo cuando lo que hay en estantería no coincide con el sistema. Si lo que anotaste mal fue la cantidad del <b>último pedido</b>, mejor usa «Corregir el último pedido» en la tarjeta de la izquierda: también arregla el gasto de Finanzas.</p>
       <form method="post" class="space-y-2" novalidate>
         {% csrf_token %}
         <input type="hidden" name="accion" value="ajustar">
         {% if f_ajuste.non_field_errors %}<p class="text-xs text-rose-500">{{ f_ajuste.non_field_errors.0 }}</p>{% endif %}
         {% include 'parciales/_campo.html' with campo=f_ajuste.stock_real icono='clipboard' ph='Stock real contado' tipo='number' step='1' minimo='0' %}
         {% include 'parciales/_campo.html' with campo=f_ajuste.motivo icono='tag' ph='Motivo del ajuste' %}
+        <label class="flex items-start gap-2 text-sm px-1 rounded-xl bg-slate-500/10 p-3"><input type="checkbox" name="error_registro" value="1" class="mt-1"{% if f_ajuste.error_registro.value %} checked{% endif %}><span><b>Fue un error de registro</b> (me equivoqué al anotar; la mercancía no se perdió). <span class="opacity-70">Queda constancia en el kardex pero <b>no cuenta como pérdida</b>. Sin marcar, una baja de stock sí se registra como pérdida en Finanzas.</span></span></label>
         <button type="submit" class="btn g4 t">Ajustar</button>
       </form>
     </section>
@@ -125,5 +158,5 @@
   <h4 class="font-extrabold mt-6 mb-2">Últimos movimientos</h4>
   {% include 'inventario/_movimientos_tabla.html' with lista=movimientos sin_producto=True %}
   <a href="{% url 'movimientos' %}?q={{ producto.codigo|urlencode }}" class="text-sm underline">Ver todos los movimientos de este producto</a>
-  <script src="{% static 'js/reposicion.js' %}?v=1"></script>
+  <script src="{% static 'js/reposicion.js' %}?v=3"></script>
 {% endblock %}

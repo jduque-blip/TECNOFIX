@@ -14,7 +14,7 @@ from . import servicios
 from core.models import Configuracion
 
 from . import precios
-from .forms import AjusteForm, CategoriaForm, ContactoProveedorForm, MargenForm, ProductoForm, ProveedorForm, ReponerForm
+from .forms import AjusteForm, CategoriaForm, ContactoProveedorForm, CorregirPedidoForm, MargenForm, ProductoForm, ProveedorForm, ReponerForm
 from .models import Categoria, MovimientoInventario, PiezaSolicitada, Producto, Proveedor
 
 POR_PAGINA = 10
@@ -136,6 +136,7 @@ def producto_editar(request, pk):
 @solo_admin
 def producto_detalle(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
+    f_corregir = CorregirPedidoForm(auto_id='cor_%s')
     f_reponer = ReponerForm(producto=producto, auto_id='rep_%s', initial=_precio_inicial(producto))
     f_ajuste = AjusteForm(auto_id='aju_%s', initial={'stock_real': producto.stock})
     if request.method == 'POST':
@@ -145,21 +146,30 @@ def producto_detalle(request, pk):
             if f_reponer.is_valid():
                 d = f_reponer.cleaned_data
                 try:
-                    _, costo_anterior = servicios.reponer(producto.pk, d['proveedor'], d['cantidad'], d['precio_unit'], d['observacion'], request.user)
+                    _, costo_anterior = servicios.reponer(
+                        producto.pk, d['proveedor'], d['cantidad'], d['precio_unit'], d['observacion'], request.user,
+                        actualizar_precio=d['actualizar_precio'],
+                    )
                 except servicios.StockError as e:
                     f_reponer.add_error(None, str(e))
                 else:
+                    producto.refresh_from_db()
                     messages.success(
                         request,
                         f'Pedido registrado: {d["cantidad"]} × ${d["precio_unit"]:.2f} = ${d["cantidad"] * d["precio_unit"]:.2f} a {d["proveedor"].nombre}. '
-                        f'El stock subió a {producto.stock + d["cantidad"]}.',
+                        f'El stock subió a {producto.stock}.',
                     )
-                    if costo_anterior and d['precio_unit'] > costo_anterior:
-                        producto.refresh_from_db()
+                    if costo_anterior and producto.costo_pedido != costo_anterior:
+                        messages.info(
+                            request,
+                            f'Costo promedio recalculado: de ${costo_anterior} a ${producto.costo_pedido}. Se promedia lo que ya había en estantería '
+                            f'(a ${costo_anterior}) con lo que acaba de llegar (a ${d["precio_unit"]:.2f}), para que el precio de venta no deje pérdida.',
+                        )
+                    if producto.bajo_objetivo and not d['actualizar_precio']:
                         messages.warning(
                             request,
-                            f'El costo subió de ${costo_anterior} a ${d["precio_unit"]}. Tu margen ahora es {producto.margen_real}% '
-                            f'(objetivo {producto.margen_objetivo.normalize():f}%). Precio sugerido: ${producto.precio_sugerido}.',
+                            f'Con este costo tu margen es {producto.margen_real}% (objetivo {producto.margen_objetivo.normalize():f}%). '
+                            f'Precio sugerido: ${producto.precio_sugerido}; el actual es ${producto.precio_venta}. Puedes pulsar «Usar el sugerido».',
                         )
                     return redirect('producto_detalle', pk=pk)
         elif accion == 'usar_sugerido':
@@ -175,15 +185,31 @@ def producto_detalle(request, pk):
             if f_ajuste.is_valid():
                 d = f_ajuste.cleaned_data
                 try:
-                    servicios.ajustar(producto.pk, d['stock_real'], d['motivo'], request.user)
+                    servicios.ajustar(producto.pk, d['stock_real'], d['motivo'], request.user, error_registro=d['error_registro'])
                 except servicios.StockError as e:
                     f_ajuste.add_error(None, str(e))
                 else:
-                    messages.success(request, 'Stock ajustado')
+                    messages.success(request, 'Stock ajustado. Quedó anotado como error de registro: no cuenta como pérdida.' if d['error_registro'] else 'Stock ajustado')
+                    return redirect('producto_detalle', pk=pk)
+        elif accion == 'corregir_pedido':
+            f_corregir = CorregirPedidoForm(request.POST, auto_id='cor_%s')
+            ultimo = producto.pedido_set.order_by('-fecha', '-pk').first()
+            if ultimo is None:
+                messages.error(request, 'Este producto no tiene pedidos que corregir.')
+                return redirect('producto_detalle', pk=pk)
+            if f_corregir.is_valid():
+                d = f_corregir.cleaned_data
+                try:
+                    servicios.corregir_pedido(ultimo.pk, d['cantidad_correcta'], d['motivo'], request.user)
+                except servicios.StockError as e:
+                    f_corregir.add_error(None, str(e))
+                else:
+                    messages.success(request, f'Pedido corregido a {d["cantidad_correcta"]} unidades. El stock y el gasto de finanzas se ajustaron; no se registró pérdida.')
                     return redirect('producto_detalle', pk=pk)
         producto.refresh_from_db()
     return render(request, 'inventario/producto_detalle.html', _tab(
-        request, producto=producto, f_reponer=f_reponer, f_ajuste=f_ajuste,
+        request, producto=producto, f_reponer=f_reponer, f_ajuste=f_ajuste, f_corregir=f_corregir,
+        ultimo_pedido=producto.pedido_set.select_related('proveedor').order_by('-fecha', '-pk').first(),
         cotizaciones=_comparador(producto),
         historial=producto.historial_precios.select_related('proveedor')[:8],
         movimientos=producto.movimientos.select_related('usuario', 'pedido')[:10],
